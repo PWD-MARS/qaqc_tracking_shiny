@@ -43,8 +43,10 @@ poolConn <- dbPool(odbc(), dsn = "mars14_datav2", uid = Sys.getenv("shiny_uid"),
 # Fiscal Quarters 
 fq <- dbGetQuery(poolConn, "SELECT * FROM admin.tbl_fiscal_quarter_lookup")
 
+
 # filter out to more recent quarters
 q_list <- fq %>%
+  arrange(fiscal_quarter_lookup_uid) %>%
   select(fiscal_quarter) %>%
   pull
 
@@ -78,10 +80,14 @@ server <- function(input, output, session) {
   
   
   #query the collection calendar and arrange by deployment_uid
-  collect_query <- "select *, data.fun_date_to_fiscal_quarter(cast(date_100percent AS DATE)) as fiscal_quarter from fieldwork.viw_qaqc_deployments"
-  rv$collect_table_db<- odbc::dbGetQuery(poolConn, collect_query) %>%
-    filter(date_100percent > ymd(Sys.Date())-years(1)) 
+  collect_query <- "select *, data.fun_date_to_fiscal_quarter(cast(date_100percent AS DATE)) as expected_fiscal_quarter, data.fun_date_to_fiscal_quarter(cast(collection_dtime_est AS DATE)) as collected_fiscal_quarter from fieldwork.viw_qaqc_deployments"
   
+  # If sensor is collected, fiscal_quarter is the quarter it was collected. If not collected, fiscal_quarter is the the quarter associated with the 100%-full date. 
+  rv$collect_table_db<- odbc::dbGetQuery(poolConn, collect_query) %>%
+    mutate(fiscal_quarter = ifelse(collected_fiscal_quarter == "", expected_fiscal_quarter, collected_fiscal_quarter)) %>%
+    inner_join(fq, by = "fiscal_quarter") %>%
+    arrange(desc(fiscal_quarter_lookup_uid))
+
   rv$term_filter <- reactive(
     if(input$term_filter == 1.5){
       c(0, 1, 2, 3, 4)
@@ -118,7 +124,7 @@ server <- function(input, output, session) {
   
   #select and rename columns to show in app
   rv$collect_table <- reactive(rv$collect_table_filter() %>%
-                                 select(`SMP ID` = smp_id, `OW Suffix`= ow_suffix, `Project Name` = project_name, Purpose = sensor_purpose, Term = term, `Collection Date` = collection_dtime_est, `100% Full Quarter` = fiscal_quarter)
+                                 select(`SMP ID` = smp_id, `OW Suffix`= ow_suffix, `Project Name` = project_name, Purpose = sensor_purpose, Term = term, `Collection Date` = collection_dtime_est, `Collected/Expected Quarter` = fiscal_quarter)
   )
                                   
 #select(`SMP ID` = smp_id, `OW Suffix`= ow_suffix, `Project Name` = project_name, Purpose = sensor_purpose, Term = term, `Collection Date` = collection_dtime_est)
