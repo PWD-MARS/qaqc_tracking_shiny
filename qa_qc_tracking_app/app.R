@@ -82,19 +82,23 @@ server <- function(input, output, session) {
   #query the collection calendar and arrange by deployment_uid
   collect_query <- "select *, data.fun_date_to_fiscal_quarter(cast(date_100percent AS DATE)) as expected_fiscal_quarter, data.fun_date_to_fiscal_quarter(cast(collection_dtime_est AS DATE)) as collected_fiscal_quarter from fieldwork.viw_qaqc_deployments"
   
-  # Data quarters for level data-populating the next fiscal quarter following a data point to compare with collection quarter
+  # Data quarters for level data-populating the next fiscal quarter for a data point to compare with collection quarter
   level_data_quarter <- odbc::dbGetQuery(poolConn, "SELECT * FROM data.mat_level_data_quarter") %>%
     inner_join(fq, by = c("level_data_quarter" = "fiscal_quarter")) %>%
     mutate(next_quarter_uid = fiscal_quarter_lookup_uid + 1) %>%
     inner_join(fq, by = c("next_quarter_uid" = "fiscal_quarter_lookup_uid")) 
     
-  # Data quarters for GW data-populating the next fiscal quarter following a data point to compare with collection quarter
+  # Data quarters for GW data-populating the next fiscal quarter for a data point to compare with collection quarter
   gw_data_quarter <- odbc::dbGetQuery(poolConn,"SELECT * FROM data.mat_gw_data_quarter") %>%
     inner_join(fq, by = c("gw_data_quarter" = "fiscal_quarter")) %>%
     mutate(next_quarter_uid = fiscal_quarter_lookup_uid + 1) %>%
     inner_join(fq, by = c("next_quarter_uid" = "fiscal_quarter_lookup_uid")) 
   
-  # If sensor is collected, fiscal_quarter is the quarter it was collected. If not collected, fiscal_quarter is the the quarter associated with the 100%-full date. 
+  # If sensor is collected, fiscal_quarter column is the quarter it was collected. If not collected, fiscal_quarter is the the quarter associated with the 100%-full date. 
+  # If OW suffix is GW- or CW1, the app looks at gw_data_quarter to find at least one data point in the past quarter
+  # if NOT  GW- or CW1, the app looks at level_data_quarter to find at least one data point in the past quarter
+  # qa_qc column looks at collection date; if no date, "No". If there is a date, looks at the ow suffix and data points in gw- or level- tables
+  # the deployments are limited to level data for short- and long-term monitoring of level data (including green inlets and any other suffix in data.tbl_ow_leveldata_raw) and groundwater data in data.tbl_gw_depthdata_raw
   rv$collect_table_db <- odbc::dbGetQuery(poolConn, collect_query) %>%
     mutate(fiscal_quarter = ifelse(collected_fiscal_quarter == "", expected_fiscal_quarter, collected_fiscal_quarter)) %>%
     inner_join(fq, by = "fiscal_quarter") %>%
