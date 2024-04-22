@@ -60,8 +60,8 @@ ui <- tagList(useShinyjs(), navbarPage("QA/QC Tracking App", id = "TabPanelID", 
                                                     
                                                     selectInput("property_type", "Property Type", choices = c("All" = .5, "Public" = 1, "Private" = 0)),
                                                     selectInput("interval_filter", "Interval", choices = c("All" = 10, "5" = 5, "15" = 15)),
-                                                    selectInput("purpose_filter", "Sensor Purpose", choices = c("All" = 1.5, "BARO" = 1, "LEVEL" = 2, "DATALOGGER" = 3), selected = 2),
-                                                    selectInput("term_filter", "Term", choices = c("All" = 1.5, "Short & Long" = 1.75,"Short" = 1, "Long"  = 2, "SRT" = 3, "Special" = 4), selected = 1.75),
+                                                    #selectInput("purpose_filter", "Sensor Purpose", choices = c("All" = 1.5, "BARO" = 1, "LEVEL" = 2, "DATALOGGER" = 3), selected = 2),
+                                                    selectInput("term_filter", "Term", choices = c("All" = 1.5, "Short" = 1, "Long"  = 2), selected = 1.5),
                                                     selectInput("f_q", "Fiscal Quarter", choices = c("All", q_list), selected = "FY24Q3")
                                                 ),
                                                 mainPanel(
@@ -82,23 +82,42 @@ server <- function(input, output, session) {
   #query the collection calendar and arrange by deployment_uid
   collect_query <- "select *, data.fun_date_to_fiscal_quarter(cast(date_100percent AS DATE)) as expected_fiscal_quarter, data.fun_date_to_fiscal_quarter(cast(collection_dtime_est AS DATE)) as collected_fiscal_quarter from fieldwork.viw_qaqc_deployments"
   
+  # Data quarters for level data-populating the next fiscal quarter following a data point to compare with collection quarter
+  level_data_quarter <- odbc::dbGetQuery(poolConn, "SELECT * FROM data.mat_level_data_quarter") %>%
+    inner_join(fq, by = c("level_data_quarter" = "fiscal_quarter")) %>%
+    mutate(next_quarter_uid = fiscal_quarter_lookup_uid + 1) %>%
+    inner_join(fq, by = c("next_quarter_uid" = "fiscal_quarter_lookup_uid")) 
+    
+  # Data quarters for GW data-populating the next fiscal quarter following a data point to compare with collection quarter
+  gw_data_quarter <- odbc::dbGetQuery(poolConn,"SELECT * FROM data.mat_gw_data_quarter") %>%
+    inner_join(fq, by = c("gw_data_quarter" = "fiscal_quarter")) %>%
+    mutate(next_quarter_uid = fiscal_quarter_lookup_uid + 1) %>%
+    inner_join(fq, by = c("next_quarter_uid" = "fiscal_quarter_lookup_uid")) 
+  
   # If sensor is collected, fiscal_quarter is the quarter it was collected. If not collected, fiscal_quarter is the the quarter associated with the 100%-full date. 
-  rv$collect_table_db<- odbc::dbGetQuery(poolConn, collect_query) %>%
+  rv$collect_table_db <- odbc::dbGetQuery(poolConn, collect_query) %>%
     mutate(fiscal_quarter = ifelse(collected_fiscal_quarter == "", expected_fiscal_quarter, collected_fiscal_quarter)) %>%
     inner_join(fq, by = "fiscal_quarter") %>%
-    arrange(desc(fiscal_quarter_lookup_uid))
+    filter(sensor_purpose == 2 & long_term_lookup_uid %in% c(1, 2)) %>%
+    left_join(level_data_quarter, by = c("ow_uid","fiscal_quarter")) %>%
+    left_join(gw_data_quarter, by = c("ow_uid","fiscal_quarter")) %>%
+    mutate(gw = ifelse(ow_suffix == "GW1" | ow_suffix == "GW2" | ow_suffix == "GW3" | ow_suffix == "GW4" | ow_suffix == "GW5" | ow_suffix == "CW1", "Yes","No")) %>%
+    mutate(qa_qc = case_when(is.na(collection_dtime_est) ~ "No",
+                             gw == "Yes" ~ ifelse(is.na(gw_data_quarter),"No","Yes"),
+                             gw == "No" ~ ifelse(is.na(level_data_quarter),"No","Yes"))) %>%
+    arrange(desc(fiscal_quarter_lookup_uid)) %>%
+    arrange(qa_qc)
+  
 
   rv$term_filter <- reactive(
     if(input$term_filter == 1.5){
-      c(0, 1, 2, 3, 4)
-    } else if (input$term_filter == 1.75) {
       c(1, 2)
     } else {
       input$term_filter
     }
   )
   
-  rv$purpose_filter <- reactive(if(input$purpose_filter == 1.5){c(0, 1, 2, 3)} else {input$purpose_filter})
+  #rv$purpose_filter <- reactive(if(input$purpose_filter == 1.5){c(0, 1, 2, 3)} else {input$purpose_filter})
   rv$quarter <- reactive(if(input$f_q == "All"){q_list} else {input$f_q})
   
   
@@ -111,7 +130,7 @@ server <- function(input, output, session) {
                                                         #use 5 or 15 minute intervals, with 10 for both, with a tolerance of 5.1 
                                                         #so if 10 is selected, 5 and 15 are picked up
                                                         near(interval_min, as.numeric(input$interval_filter), tol = 5.1) &
-                                                        sensor_purpose %in% rv$purpose_filter() &
+                                                        #sensor_purpose %in% rv$purpose_filter() &
                                                         long_term_lookup_uid %in% rv$term_filter() & 
                                                         fiscal_quarter %in% rv$quarter()) %>%
                                         mutate(across("sensor_purpose",
@@ -124,7 +143,7 @@ server <- function(input, output, session) {
   
   #select and rename columns to show in app
   rv$collect_table <- reactive(rv$collect_table_filter() %>%
-                                 select(`SMP ID` = smp_id, `OW Suffix`= ow_suffix, `Project Name` = project_name, Purpose = sensor_purpose, Term = term, `Collection Date` = collection_dtime_est, `Collected/Expected Quarter` = fiscal_quarter)
+                                 select(`SMP ID` = smp_id, `OW Suffix`= ow_suffix, `Project Name` = project_name, Purpose = sensor_purpose, Term = term, `Collection Date` = collection_dtime_est, `Collected/Expected Quarter` = fiscal_quarter, `QA/QC` = qa_qc)
   )
                                   
 #select(`SMP ID` = smp_id, `OW Suffix`= ow_suffix, `Project Name` = project_name, Purpose = sensor_purpose, Term = term, `Collection Date` = collection_dtime_est)
