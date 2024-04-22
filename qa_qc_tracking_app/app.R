@@ -98,13 +98,13 @@ server <- function(input, output, session) {
   rv$collect_table_db <- odbc::dbGetQuery(poolConn, collect_query) %>%
     mutate(fiscal_quarter = ifelse(collected_fiscal_quarter == "", expected_fiscal_quarter, collected_fiscal_quarter)) %>%
     inner_join(fq, by = "fiscal_quarter") %>%
-    filter(sensor_purpose == 2 & long_term_lookup_uid %in% c(1, 2)) %>%
     left_join(level_data_quarter, by = c("ow_uid","fiscal_quarter")) %>%
     left_join(gw_data_quarter, by = c("ow_uid","fiscal_quarter")) %>%
     mutate(gw = ifelse(ow_suffix == "GW1" | ow_suffix == "GW2" | ow_suffix == "GW3" | ow_suffix == "GW4" | ow_suffix == "GW5" | ow_suffix == "CW1", "Yes","No")) %>%
     mutate(qa_qc = case_when(is.na(collection_dtime_est) ~ "No",
                              gw == "Yes" ~ ifelse(is.na(gw_data_quarter),"No","Yes"),
                              gw == "No" ~ ifelse(is.na(level_data_quarter),"No","Yes"))) %>%
+    filter(sensor_purpose == 2 & long_term_lookup_uid %in% c(1, 2)) %>%
     arrange(desc(fiscal_quarter_lookup_uid)) %>%
     arrange(qa_qc)
   
