@@ -161,8 +161,13 @@ server <- function(input, output, session) {
       class = 'table-responsive, table-hover', 
       options = list(scroller = TRUE, 
                      scrollX = TRUE, 
-                     scrollY = 950), 
-      rownames = FALSE) 
+                     scrollY = 950),
+      rownames = FALSE) %>%
+      formatStyle(
+        'QA/QC',
+        backgroundColor = styleEqual(c('Yes','No'), c('green','yellow')),
+        color = styleEqual('Yes', 'white')
+      )
   )
   
 }
