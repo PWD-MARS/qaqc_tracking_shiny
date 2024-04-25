@@ -26,6 +26,8 @@ library(reactable)
 #excel download
 library(xlsx)
 library(DBI)
+# managing long notes in UI
+library(shinipsum)
 #Not in logical
 `%!in%` <- Negate(`%in%`)
 
@@ -50,6 +52,27 @@ q_list <- fq %>%
   select(fiscal_quarter) %>%
   pull
 
+
+js <- "
+function(cell) {
+  var $cell = $(cell);
+  $cell.contents().wrapAll('<div class=\\\"content\\\"></div>');
+  var $content = $cell.find('.content');
+  $cell.append($('<button>Read more</button>'));
+  $btn = $cell.find('button');
+  $content.css({
+    height: '50px',
+    overflow: 'hidden'
+  });
+  $cell.data('isLess', true);
+  $btn.click(function () {
+    var isLess = $cell.data('isLess');
+    $content.css('height', isLess ? 'auto' : '50px');
+    $(this).text(isLess ? 'Read less' : 'Read more');
+    $cell.data('isLess', !isLess);
+  });
+}
+"
 # Define UI
 ui <- tagList(useShinyjs(), navbarPage("QA/QC Tracking App", id = "TabPanelID", theme = shinytheme("cerulean"),
                                        #1.1 Unmonitored Active SMPs -------
@@ -249,13 +272,20 @@ server <- function(input, output, session) {
   #2.1 showing table ----
   output$deployments <- renderDT(
     DT::datatable(
-      rv$collect_table(), 
-      selection = "single", 
-      style = 'bootstrap', 
-      class = 'table-responsive, table-hover', 
-      options = list(scroller = TRUE, 
-                     scrollX = TRUE, 
-                     scrollY = 950),
+      rv$collect_table(),
+      selection = "single",
+      style = 'bootstrap',
+      class = 'table-responsive, table-hover',
+      options = list(scroller = TRUE,
+                     scrollX = TRUE,
+                     scrollY = 950,
+                     "columnDefs" = list(
+                       list(
+                         width = '250px',
+                         "targets" = 7,
+                         "createdCell" = JS(js)
+                       )
+                     )),
       rownames = FALSE) %>%
       formatStyle(
         'QAed Data in DB?',
@@ -272,6 +302,11 @@ server <- function(input, output, session) {
         fontWeight = 'bold'
       )
   )
+
+  
+
+  
+  
   
 }
 
