@@ -57,26 +57,6 @@ q_list <- fq %>%
   pull
 
 
-js <- "
-function(cell) {
-  var $cell = $(cell);
-  $cell.contents().wrapAll('<div class=\\\"content\\\"></div>');
-  var $content = $cell.find('.content');
-  $cell.append($('<button>Read more</button>'));
-  $btn = $cell.find('button');
-  $content.css({
-    height: '50px',
-    overflow: 'hidden'
-  });
-  $cell.data('isLess', true);
-  $btn.click(function () {
-    var isLess = $cell.data('isLess');
-    $content.css('height', isLess ? 'auto' : '50px');
-    $(this).text(isLess ? 'Read less' : 'Read more');
-    $cell.data('isLess', !isLess);
-  });
-}
-"
 # Define UI
 ui <- tagList(useShinyjs(), navbarPage("QA/QC Tracking App", id = "TabPanelID", theme = shinytheme("cerulean"),
                                        #1.1 Unmonitored Active SMPs -------
@@ -214,7 +194,7 @@ server <- function(input, output, session) {
                                                         #sensor_purpose %in% rv$purpose_filter() &
                                                         long_term_lookup_uid %in% rv$term_filter() & 
                                                         fiscal_quarter %in% rv$quarter() &
-                                                        smp_id %in% rv$smp_filter()) %>%
+                                                        smp_id %in% rv$smp_filter()) %>% 
                                                         #ifelse(input$smp_id == "All", TRUE, smp_id == input$smp_id)) %>%
                                         mutate(across("sensor_purpose",
                                                       ~ case_when(. == 1 ~ "Baro",
