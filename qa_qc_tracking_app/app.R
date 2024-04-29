@@ -309,7 +309,7 @@ server <- function(input, output, session) {
                   }
                   list(backgroundColor = color, color = textColor, fontweight = "bold")
                 }),
-                `QAed Data in DB?` = colDef(width = 200, style = function(value){
+                `QAed Data in DB?` = colDef(width = 150, style = function(value){
                   if(value == "No"){
                     color = "yellow"
                     textColor = "black"
