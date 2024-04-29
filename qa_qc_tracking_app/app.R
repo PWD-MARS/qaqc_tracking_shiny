@@ -96,7 +96,8 @@ ui <- tagList(useShinyjs(), navbarPage("QA/QC Tracking App", id = "TabPanelID", 
                                                     
                                                 ),
                                                 mainPanel(
-                                                  DTOutput("deployments"), 
+                                                  #DTOutput("deployments"),
+                                                  reactableOutput("deployments"),
                                                   width = 9
                                                   
                                                 )
@@ -209,11 +210,10 @@ server <- function(input, output, session) {
   
   #select and rename columns to show in app
   rv$collect_table <- reactive(rv$collect_table_filter() %>%
-                                 select(`SMP ID` = smp_id, `OW Suffix`= ow_suffix, `Project Name` = project_name, Term = term, `Collection Date` = collection_status, `QAed Data in DB?` = qa_qc, Status = status, Notes =  qaqc_notes)
+                                 select(`SMP ID` = smp_id, `OW Suffix`= ow_suffix, `Project Name` = project_name, Term = term, `Collection Date` = collection_status, `QAed Data in DB?` = qa_qc, Status = status, deployment_uid) #, Notes =  qaqc_notes)
   )
                                   
-#select(`SMP ID` = smp_id, `OW Suffix`= ow_suffix, `Project Name` = project_name, Purpose = sensor_purpose, Term = term, `Collection Date` = collection_dtime_est)
-  
+
   # Update the values in the drop-down menus when a row is selected
   observeEvent(input$deployments_rows_selected, {
     # Get the selected row
@@ -267,43 +267,58 @@ server <- function(input, output, session) {
   )
     
   
+  output$deployments <- renderReactable(
+    reactable(rv$collect_table() %>%
+                select(-deployment_uid), 
+              fullWidth = TRUE,
+              selection = "single",
+              searchable = TRUE,
+              onClick = "select",
+              selectionId = "deployments_rows_selected",
+              #searchable = TRUE,
+              showPageSizeOptions = TRUE,
+              pageSizeOptions = c(25, 50, 100),
+              defaultPageSize = 25,
+              height = 1050,
+              columns = list(
+                #`System ID` = colDef(width = 90),
+                `SMP ID` = colDef(width = 100),
+                `OW Suffix` = colDef(width = 100),
+                `Project Name` = colDef(width = 400),
+                 Term = colDef(width = 75),
+                `Collection Date` = colDef(width = 125, style = function(value){
+                  if(value == "Not Collected"){
+                    color = "yellow"
+                    textColor = "black"
+                  }else{
+                    color = "green"
+                    textColor = "white"
+                  }
+                  list(backgroundColor = color, color = textColor, fontweight = "bold")
+                }),
+                `Status` = colDef(width = 300),
+                `QAed Data in DB?` = colDef(width = 200, style = function(value){
+                  if(value == "No"){
+                    color = "yellow"
+                    textColor = "black"
+                  }else{
+                    color = "green"
+                    textColor = "white"
+                  }
+                  list(backgroundColor = color, color = textColor, fontweight = "bold")
+                })),
+              details = function(index) {
+                nested_notes <- rv$status_notes()[rv$status_notes()$deployment_uid == rv$collect_table()$deployment_uid[index], ] %>%
+                  select(Notes = qaqc_notes)
+                htmltools::div(style = "padding: 1rem",
+                               reactable(nested_notes, columns = list(
+                                 Notes = colDef(width = 950)
+                               ), outlined = TRUE)
+                )
+              }
   
-  
-  #2.1 showing table ----
-  output$deployments <- renderDT(
-    DT::datatable(
-      rv$collect_table(),
-      selection = "single",
-      style = 'bootstrap',
-      class = 'table-responsive, table-hover',
-      options = list(scroller = TRUE,
-                     scrollX = TRUE,
-                     scrollY = 950,
-                     "columnDefs" = list(
-                       list(
-                         width = '250px',
-                         "targets" = 7,
-                         "createdCell" = JS(js)
-                       )
-                     )),
-      rownames = FALSE) %>%
-      formatStyle(
-        'QAed Data in DB?',
-        backgroundColor = styleEqual(c('Yes','No'), c('green','yellow')),
-        color = styleEqual('Yes', 'white'),
-        fontWeight = 'bold'
-      ) %>%
-      formatStyle(
-        'Collection Date',
-        backgroundColor = styleEqual('Not Collected', 'pink')
-      ) %>%
-      formatStyle(
-        'SMP ID',
-        fontWeight = 'bold'
-      )
-  )
-
-  
+              )
+    )
 
   
   
