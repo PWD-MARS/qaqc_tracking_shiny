@@ -181,7 +181,7 @@ server <- function(input, output, session) {
   #rv$purpose_filter <- reactive(if(input$purpose_filter == 1.5){c(0, 1, 2, 3)} else {input$purpose_filter})
   rv$quarter <- reactive(if(input$f_q == "All"){q_list} else {input$f_q})
   
-  
+
   #arrange and filtered the collection calendar
   rv$collect_table_filter <- reactive(rv$collect_table_db() %>% 
                                         mutate(collection_dtime_est = collection_dtime_est %>% lubridate::ymd()) %>%
@@ -202,6 +202,7 @@ server <- function(input, output, session) {
                                                                   . == 3 ~ "Data Logger")))
                                       
                                         ) 
+  
   
   
   #select and rename columns to show in app
