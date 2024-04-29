@@ -296,7 +296,19 @@ server <- function(input, output, session) {
                   }
                   list(backgroundColor = color, color = textColor, fontweight = "bold")
                 }),
-                `Status` = colDef(width = 300),
+                `Status` = colDef(width = 300, style = function(value){
+                  if(!is.na(value) & value == "Complete"){
+                    color = "green"
+                    textColor = "white"
+                  }else if(is.na(value)){
+                    color = "white"
+                    textColor = "black"
+                  }else{
+                    color = "yellow"
+                    textColor = "black"
+                  }
+                  list(backgroundColor = color, color = textColor, fontweight = "bold")
+                }),
                 `QAed Data in DB?` = colDef(width = 200, style = function(value){
                   if(value == "No"){
                     color = "yellow"
