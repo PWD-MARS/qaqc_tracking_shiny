@@ -42,6 +42,10 @@ options(DT.options = list(pageLength = 25))
 #gets environmental variables saved in local or pwdrstudio environment
 poolConn <- dbPool(odbc(), dsn = "mars14_datav2", uid = Sys.getenv("shiny_uid"), pwd = Sys.getenv("shiny_pwd"))
 
+data <- odbc::dbGetQuery(poolConn, paste0("select distinct smp_id from external.mat_assets")) %>% 
+  dplyr::arrange(smp_id)
+# vector  of all systems ids with wics 
+names(data) <- "SMP ID"
 # Fiscal Quarters 
 fq <- dbGetQuery(poolConn, "SELECT * FROM admin.tbl_fiscal_quarter_lookup")
 
@@ -80,7 +84,7 @@ ui <- tagList(useShinyjs(), navbarPage("QA/QC Tracking App", id = "TabPanelID", 
                                                 titlePanel("Level Sensor Deployments Table"),
                                                 sidebarLayout(
                                                   sidebarPanel(
-                                                    
+                                                    selectInput("smp_id", "SMP ID", choices = c("All", data), selected = "All"),
                                                     selectInput("property_type", "Property Type", choices = c("All" = .5, "Public" = 1, "Private" = 0)),
                                                     selectInput("interval_filter", "Interval", choices = c("All" = 10, "5" = 5, "15" = 15)),
                                                     #selectInput("purpose_filter", "Sensor Purpose", choices = c("All" = 1.5, "BARO" = 1, "LEVEL" = 2, "DATALOGGER" = 3), selected = 2),
@@ -184,6 +188,16 @@ server <- function(input, output, session) {
     }
   )
   
+  
+  
+  rv$smp_filter <- reactive(
+    if(input$smp_id == "All"){
+      data$'SMP ID'
+    } else {
+      input$smp_id
+    }
+  )
+  
   #rv$purpose_filter <- reactive(if(input$purpose_filter == 1.5){c(0, 1, 2, 3)} else {input$purpose_filter})
   rv$quarter <- reactive(if(input$f_q == "All"){q_list} else {input$f_q})
   
@@ -199,7 +213,9 @@ server <- function(input, output, session) {
                                                         near(interval_min, as.numeric(input$interval_filter), tol = 5.1) &
                                                         #sensor_purpose %in% rv$purpose_filter() &
                                                         long_term_lookup_uid %in% rv$term_filter() & 
-                                                        fiscal_quarter %in% rv$quarter()) %>%
+                                                        fiscal_quarter %in% rv$quarter() &
+                                                        smp_id %in% rv$smp_filter()) %>%
+                                                        #ifelse(input$smp_id == "All", TRUE, smp_id == input$smp_id)) %>%
                                         mutate(across("sensor_purpose",
                                                       ~ case_when(. == 1 ~ "Baro",
                                                                   . == 2 ~ "Level",
@@ -210,7 +226,7 @@ server <- function(input, output, session) {
   
   #select and rename columns to show in app
   rv$collect_table <- reactive(rv$collect_table_filter() %>%
-                                 select(`SMP ID` = smp_id, `OW Suffix`= ow_suffix, `Project Name` = project_name, Term = term, `Collection Date` = collection_status, `QAed Data in DB?` = qa_qc, Status = status, deployment_uid) #, Notes =  qaqc_notes)
+                                 select(`SMP ID` = smp_id, `OW Suffix`= ow_suffix, `Project Name` = project_name, Term = term, `Collection Date` = collection_status, `Collected/Expected Quarter` = fiscal_quarter, `QAed Data in DB?` = qa_qc, Status = status, deployment_uid) #, Notes =  qaqc_notes)
   )
                                   
 
@@ -282,10 +298,11 @@ server <- function(input, output, session) {
               height = 1050,
               columns = list(
                 #`System ID` = colDef(width = 90),
-                `SMP ID` = colDef(width = 100),
+                `SMP ID` = colDef(width = 75),
                 `OW Suffix` = colDef(width = 100),
                 `Project Name` = colDef(width = 400),
                  Term = colDef(width = 75),
+                `Collected/Expected Quarter` = colDef(width = 200),
                 `Collection Date` = colDef(width = 125, style = function(value){
                   if(value == "Not Collected"){
                     color = "yellow"
@@ -296,7 +313,7 @@ server <- function(input, output, session) {
                   }
                   list(backgroundColor = color, color = textColor, fontweight = "bold")
                 }),
-                `Status` = colDef(width = 300, style = function(value){
+                `Status` = colDef(width = 250, style = function(value){
                   if(!is.na(value) & value == "Complete"){
                     color = "green"
                     textColor = "white"
