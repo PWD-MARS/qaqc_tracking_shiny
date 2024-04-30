@@ -170,14 +170,14 @@ server <- function(input, output, session) {
   
   
   
-  # rv$smp_filter <- reactive(
-  #   if(input$smp_id == "All"){
-  #     data$'SMP ID'
-  #   } else {
-  #     input$smp_id
-  #   }
-  # )
-  
+  rv$smp_filter <- reactive(
+    if(input$smp_id == "All"){
+      data$'SMP ID'
+    } else {
+      input$smp_id
+    }
+  )
+
   #rv$purpose_filter <- reactive(if(input$purpose_filter == 1.5){c(0, 1, 2, 3)} else {input$purpose_filter})
   rv$quarter <- reactive(if(input$f_q == "All"){q_list} else {input$f_q})
   
@@ -194,7 +194,7 @@ server <- function(input, output, session) {
                                                         #sensor_purpose %in% rv$purpose_filter() &
                                                         long_term_lookup_uid %in% rv$term_filter() & 
                                                         fiscal_quarter %in% rv$quarter() &
-                                                        ifelse(input$smp_id == "All", TRUE, smp_id == input$smp_id)) %>% 
+                                                        smp_id %in%  rv$smp_filter()) %>% 
                                                         #ifelse(input$smp_id == "All", TRUE, smp_id == input$smp_id)) %>%
                                         mutate(across("sensor_purpose",
                                                       ~ case_when(. == 1 ~ "Baro",
