@@ -69,8 +69,8 @@ ui <- tagList(useShinyjs(), navbarPage("QA/QC Tracking App", id = "TabPanelID", 
                                                     selectInput("interval_filter", "Interval", choices = c("All" = 10, "5" = 5, "15" = 15)),
                                                     #selectInput("purpose_filter", "Sensor Purpose", choices = c("All" = 1.5, "BARO" = 1, "LEVEL" = 2, "DATALOGGER" = 3), selected = 2),
                                                     selectInput("term_filter", "Term", choices = c("All" = 1.5, "Short" = 1, "Long"  = 2), selected = 1.5),
-                                                    selectInput("f_q", "Collected/Expected Fiscal Quarter", choices = c("All", q_list), selected = "All"),
-                                                    selectInput("status", "QA/QC Status", c("","Complete", "Needs Edit/Check", "Unresolved Issue", "Partially Complete"), selected = NULL),
+                                                    selectInput("f_q", "Collected/Expected Fiscal Quarter", choices = c("All", q_list), selected = "FY24Q3"),
+                                                    conditionalPanel("input.deployments_rows_selected != 0", selectInput("status", "QA/QC Status", c("","Complete", "Needs Edit/Check", "Unresolved Issue", "Partially Complete"), selected = NULL)),
                                                     #textAreaInput("qaqc_note", "Comments", height = '85px'),
                                                     conditionalPanel("input.deployments_rows_selected != 0",
                                                                      textAreaInput("qaqc_comments", "Additional Comments:", height = '85px')),
@@ -170,13 +170,13 @@ server <- function(input, output, session) {
   
   
   
-  rv$smp_filter <- reactive(
-    if(input$smp_id == "All"){
-      data$'SMP ID'
-    } else {
-      input$smp_id
-    }
-  )
+  # rv$smp_filter <- reactive(
+  #   if(input$smp_id == "All"){
+  #     data$'SMP ID'
+  #   } else {
+  #     input$smp_id
+  #   }
+  # )
   
   #rv$purpose_filter <- reactive(if(input$purpose_filter == 1.5){c(0, 1, 2, 3)} else {input$purpose_filter})
   rv$quarter <- reactive(if(input$f_q == "All"){q_list} else {input$f_q})
@@ -194,7 +194,7 @@ server <- function(input, output, session) {
                                                         #sensor_purpose %in% rv$purpose_filter() &
                                                         long_term_lookup_uid %in% rv$term_filter() & 
                                                         fiscal_quarter %in% rv$quarter() &
-                                                        smp_id %in% rv$smp_filter()) %>% 
+                                                        ifelse(input$smp_id == "All", TRUE, smp_id == input$smp_id)) %>% 
                                                         #ifelse(input$smp_id == "All", TRUE, smp_id == input$smp_id)) %>%
                                         mutate(across("sensor_purpose",
                                                       ~ case_when(. == 1 ~ "Baro",
@@ -276,7 +276,7 @@ server <- function(input, output, session) {
               showPageSizeOptions = TRUE,
               pageSizeOptions = c(25, 50, 100),
               defaultPageSize = 25,
-              height = 1050,
+              height = 1200,
               columns = list(
                 #`System ID` = colDef(width = 90),
                 `SMP ID` = colDef(width = 75),
