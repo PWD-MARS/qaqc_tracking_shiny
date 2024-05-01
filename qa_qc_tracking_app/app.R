@@ -211,7 +211,7 @@ server <- function(input, output, session) {
   
   #select and rename columns to show in app
   rv$collect_table <- reactive(rv$collect_table_filter() %>%
-                                 select(`SMP ID` = smp_id, `OW Suffix`= ow_suffix, `Project Name` = project_name, Term = term, `Collection Date` = collection_status, `Collected/Expected Quarter` = fiscal_quarter, `QAed Data in DB?` = qa_qc, Status = status, deployment_uid) #, Notes =  qaqc_notes)
+                                 select(`SMP ID` = smp_id, `OW Suffix`= ow_suffix, `Project Name` = project_name, Term = term, `Collection Date` = collection_status, `Collected/Expected Quarter` = fiscal_quarter, `Data in DB?` = qa_qc, Status = status, deployment_uid) #, Notes =  qaqc_notes)
   )
                                   
 
@@ -280,14 +280,14 @@ server <- function(input, output, session) {
               showPageSizeOptions = TRUE,
               pageSizeOptions = c(25, 50, 100),
               defaultPageSize = 25,
-              height = 1200,
+              height = 1150,
               columns = list(
                 #`System ID` = colDef(width = 90),
-                `SMP ID` = colDef(width = 100),
+                `SMP ID` = colDef(width = 85),
                 `OW Suffix` = colDef(width = 100),
-                `Project Name` = colDef(width = 400),
+                `Project Name` = colDef(width = 350),
                  Term = colDef(width = 75),
-                `Collected/Expected Quarter` = colDef(width = 250),
+                `Collected/Expected Quarter` = colDef(width = 225),
                 `Collection Date` = colDef(width = 125, style = function(value){
                   if(value == "Not Collected"){
                     color = "yellow"
@@ -317,7 +317,7 @@ server <- function(input, output, session) {
                   }
                   list(backgroundColor = color, color = textColor, fontweight = "bold")
                 }),
-                `QAed Data in DB?` = colDef(width = 150, style = function(value){
+                `Data in DB?` = colDef(width = 100, style = function(value){
                   if(value == "No"){
                     color = "yellow"
                     textColor = "black"
