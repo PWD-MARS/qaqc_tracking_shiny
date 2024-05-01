@@ -206,7 +206,8 @@ server <- function(input, output, session) {
                                         mutate(across("sensor_purpose",
                                                       ~ case_when(. == 1 ~ "Baro",
                                                                   . == 2 ~ "Level",
-                                                                  . == 3 ~ "Data Logger")))
+                                                                  . == 3 ~ "Data Logger"))) %>%
+                                        distinct()
                                       
                                         ) 
   
