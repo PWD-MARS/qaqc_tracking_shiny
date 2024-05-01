@@ -96,7 +96,7 @@ server <- function(input, output, session) {
   
   rv <- reactiveValues()  
   #toggle state for the update button
-  observe(toggleState(id = "update_button", condition = !is.null(input$deployments_rows_selected)))
+  observe(toggleState(id = "update_button", condition = !is.null(input$deployments_rows_selected) & input$status != ""))
   
   selected_row <- reactiveVal()
   
