@@ -76,8 +76,9 @@ ui <- tagList(useShinyjs(), navbarPage("QA/QC Tracking App", id = "TabPanelID", 
                                                     conditionalPanel("input.deployments_rows_selected != 0",
                                                                      textAreaInput("qaqc_comments", "Add/Edit Additional Comments:", height = '85px')),
                                                     conditionalPanel("input.deployments_rows_selected != 0",
-                                                                     h6("Note: You Must Pick a QA/QC Status for the Deployment to be Able to Edit!")),
-                                                    actionButton("update_button", "Update"),
+                                                                     h6("You Must Pick a QA/QC Status for the Deployment to be Able to Edit!")),
+                                                    actionButton("update_button", "Update", icon("paper-plane"), 
+                                                                 style="color: #fff; background-color: #337ab7; border-color: #2e6da4"),
                                                     width = 3
                                                     
                                                     
