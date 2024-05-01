@@ -49,6 +49,9 @@ names(data) <- "SMP ID"
 # Fiscal Quarters 
 fq <- dbGetQuery(poolConn, "SELECT * FROM admin.tbl_fiscal_quarter_lookup")
 
+current_fq_query <- paste("select data.fun_date_to_fiscal_quarter('", Sys.Date(),"')", sep = "")
+current_fq <- odbc::dbGetQuery(poolConn, current_fq_query) %>% 
+  pull
 
 # filter out to more recent quarters
 q_list <- fq %>%
@@ -69,7 +72,7 @@ ui <- tagList(useShinyjs(), navbarPage("QA/QC Tracking App", id = "TabPanelID", 
                                                     selectInput("interval_filter", "Interval", choices = c("All" = 10, "5" = 5, "15" = 15)),
                                                     #selectInput("purpose_filter", "Sensor Purpose", choices = c("All" = 1.5, "BARO" = 1, "LEVEL" = 2, "DATALOGGER" = 3), selected = 2),
                                                     selectInput("term_filter", "Term", choices = c("All" = 1.5, "Short" = 1, "Long"  = 2), selected = 1.5),
-                                                    selectInput("f_q", "Collected/Expected Fiscal Quarter", choices = c("All", q_list), selected = "FY24Q3"),
+                                                    selectInput("f_q", "Collected/Expected Fiscal Quarter", choices = c("All", q_list), selected = current_fq),
                                                     conditionalPanel("input.deployments_rows_selected != 0",
                                                                      selectInput("status", "Add/Edit QA/QC Status:", c("","Complete", "Needs Edit/Check", "Unresolved Issue with Data", "Partially Complete"), selected = NULL)),
                                                     #textAreaInput("qaqc_note", "Comments", height = '85px'),
