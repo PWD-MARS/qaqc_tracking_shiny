@@ -70,7 +70,7 @@ ui <- tagList(useShinyjs(), navbarPage("QA/QC Tracking App", id = "TabPanelID", 
                                                     #selectInput("purpose_filter", "Sensor Purpose", choices = c("All" = 1.5, "BARO" = 1, "LEVEL" = 2, "DATALOGGER" = 3), selected = 2),
                                                     selectInput("term_filter", "Term", choices = c("All" = 1.5, "Short" = 1, "Long"  = 2), selected = 1.5),
                                                     selectInput("f_q", "Collected/Expected Fiscal Quarter", choices = c("All", q_list), selected = "FY24Q3"),
-                                                    conditionalPanel("input.deployments_rows_selected != 0", selectInput("status", "QA/QC Status", c("","Complete", "Needs Edit/Check", "Unresolved Issue", "Partially Complete"), selected = NULL)),
+                                                    conditionalPanel("input.deployments_rows_selected != 0", selectInput("status", "QA/QC Status", c("","Complete", "Needs Edit/Check", "Unresolved Issue with Data", "Partially Complete"), selected = NULL)),
                                                     #textAreaInput("qaqc_note", "Comments", height = '85px'),
                                                     conditionalPanel("input.deployments_rows_selected != 0",
                                                                      textAreaInput("qaqc_comments", "Additional Comments:", height = '85px')),
@@ -301,8 +301,14 @@ server <- function(input, output, session) {
                   }else if(is.na(value)){
                     color = "white"
                     textColor = "black"
+                  }else if (value == "Needs Edit/Check"){
+                    color = "lightgreen"
+                    textColor = "black"
+                  }else if (value == "Unresolved Issue with Data"){
+                    color = "red"
+                    textColor = "white"
                   }else{
-                    color = "yellow"
+                    color = "orange"
                     textColor = "black"
                   }
                   list(backgroundColor = color, color = textColor, fontweight = "bold")
