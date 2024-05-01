@@ -22,7 +22,7 @@ library(DT)
 #reactable
 library(reactable)
 #reactable for reactable tables
-library(reactable)
+library(reactablefmtr)
 #excel download
 library(xlsx)
 library(DBI)
@@ -58,7 +58,7 @@ q_list <- fq %>%
 
 
 # Define UI
-ui <- tagList(useShinyjs(), navbarPage("QA/QC Tracking App", id = "TabPanelID", theme = shinytheme("cerulean"),
+ui <- tagList(useShinyjs(), navbarPage("QA/QC Tracking App", id = "TabPanelID", theme = shinytheme("flatly"),
                                        #1.1 Unmonitored Active SMPs -------
                                        tabPanel("Deployments QA/QC Status", value = "deployment_value", 
                                                 titlePanel("Level Sensor Deployments Table"),
@@ -282,11 +282,11 @@ server <- function(input, output, session) {
               height = 1200,
               columns = list(
                 #`System ID` = colDef(width = 90),
-                `SMP ID` = colDef(width = 75),
+                `SMP ID` = colDef(width = 100),
                 `OW Suffix` = colDef(width = 100),
                 `Project Name` = colDef(width = 400),
                  Term = colDef(width = 75),
-                `Collected/Expected Quarter` = colDef(width = 200),
+                `Collected/Expected Quarter` = colDef(width = 250),
                 `Collection Date` = colDef(width = 125, style = function(value){
                   if(value == "Not Collected"){
                     color = "yellow"
