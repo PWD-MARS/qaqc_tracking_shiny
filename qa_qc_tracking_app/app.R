@@ -49,7 +49,7 @@ names(data) <- "SMP ID"
 # Fiscal Quarters 
 fq <- dbGetQuery(poolConn, "SELECT * FROM admin.tbl_fiscal_quarter_lookup")
 
-current_fq_query <- paste("select data.fun_date_to_fiscal_quarter('", Sys.Date(),"')", sep = "")
+current_fq_query <- paste("select data.fun_date_to_fiscal_quarter('", Sys.Date() - months(3),"')", sep = "")
 current_fq <- odbc::dbGetQuery(poolConn, current_fq_query) %>% 
   pull
 
