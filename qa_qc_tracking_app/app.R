@@ -233,7 +233,7 @@ server <- function(input, output, session) {
   
   #select and rename columns to show in app
   rv$collect_table <- reactive(rv$collect_table_filter() %>%
-                                 select(`SMP ID` = smp_id, `OW Suffix`= ow_suffix, `Project Name` = project_name, Term = term, `Collection Date` = collection_status, `Collected/Expected Quarter` = fiscal_quarter, `Data in DB?` = qa_qc, Status = status, deployment_uid) %>%
+                                 select(`SMP ID` = smp_id, `OW Suffix`= ow_suffix, `Project Name` = project_name, Term = term,`Collected/Expected Quarter` = fiscal_quarter, `Collection Date` = collection_status, `Data in DB?` = qa_qc, Status = status, deployment_uid) %>%
                                  distinct()#, Notes =  qaqc_notes)
   )
                                   
