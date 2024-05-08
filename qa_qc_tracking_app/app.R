@@ -60,6 +60,17 @@ q_list <- fq %>%
   pull
 
 
+# #replace special characters with friendlier characters
+special_char_replace <- function(note){
+  
+  note_fix <- note %>%
+    str_replace_all(c("•" = "-", "ï‚§" = "-", "“" = '"', '”' = '"'))
+  
+  return(note_fix)
+  
+}
+
+
 # Define UI
 ui <- tagList(useShinyjs(), navbarPage("QA/QC Tracking App", id = "TabPanelID", theme = shinytheme("flatly"),
                                        #1.1 Unmonitored Active SMPs -------
@@ -102,6 +113,13 @@ ui <- tagList(useShinyjs(), navbarPage("QA/QC Tracking App", id = "TabPanelID", 
 server <- function(input, output, session) {
   
   rv <- reactiveValues()  
+  
+
+  #process text field to prevent sql injection
+  rv$reason_step <- reactive(gsub('\'', '\'\'',  input$qaqc_comments))
+  rv$input_note  <- reactive(special_char_replace(rv$reason_step()))
+  
+  
   #toggle state for the update button
   observe(toggleState(id = "update_button", condition = !is.null(input$deployments_rows_selected) & input$status != ""))
   
@@ -215,7 +233,8 @@ server <- function(input, output, session) {
   
   #select and rename columns to show in app
   rv$collect_table <- reactive(rv$collect_table_filter() %>%
-                                 select(`SMP ID` = smp_id, `OW Suffix`= ow_suffix, `Project Name` = project_name, Term = term, `Collection Date` = collection_status, `Collected/Expected Quarter` = fiscal_quarter, `Data in DB?` = qa_qc, Status = status, deployment_uid) #, Notes =  qaqc_notes)
+                                 select(`SMP ID` = smp_id, `OW Suffix`= ow_suffix, `Project Name` = project_name, Term = term, `Collection Date` = collection_status, `Collected/Expected Quarter` = fiscal_quarter, `Data in DB?` = qa_qc, Status = status, deployment_uid) %>%
+                                 distinct()#, Notes =  qaqc_notes)
   )
                                   
 
@@ -237,17 +256,17 @@ server <- function(input, output, session) {
     row <- input$deployments_rows_selected
     #if(is.na(rv$collect_table_filter()$qaqc_notes[row]) & is.na(rv$collect_table_filter()$status[row])) {
     
-      if((input$status != "" | input$qaqc_comments != "") & rv$collect_table_filter()$deployment_uid[row] %!in% rv$status_notes()$deployment_uid) {
+      if((input$status != "" | rv$input_note() != "") & rv$collect_table_filter()$deployment_uid[row] %!in% rv$status_notes()$deployment_uid) {
       new_note_status <- data.frame(deployment_uid = rv$collect_table_filter()$deployment_uid[row],
                                     status = input$status,
-                                    qaqc_notes = input$qaqc_comments)
+                                    qaqc_notes = rv$input_note())
       
       odbc::dbWriteTable(poolConn, Id(schema = "fieldwork", table = "tbl_qaqc_status"), new_note_status, append= TRUE, row.names = FALSE )
       
-      } else if ((input$status != "" | input$qaqc_comments != "") & rv$collect_table_filter()$deployment_uid[row] %in% rv$status_notes()$deployment_uid) {
+      } else if ((input$status != "" | rv$input_note() != "") & rv$collect_table_filter()$deployment_uid[row] %in% rv$status_notes()$deployment_uid) {
     
         edit_query <- paste0(
-          "Update fieldwork.tbl_qaqc_status SET status ='", input$status,"', qaqc_notes = '", input$qaqc_comments, "' where deployment_uid = ", rv$collect_table_filter()$deployment_uid[row])
+          "Update fieldwork.tbl_qaqc_status SET status ='", input$status,"', qaqc_notes = '", rv$input_note(), "' where deployment_uid = ", rv$collect_table_filter()$deployment_uid[row])
         odbc::dbGetQuery(poolConn, edit_query)
         
         
