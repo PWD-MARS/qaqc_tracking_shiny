@@ -148,13 +148,13 @@ server <- function(input, output, session) {
   
   # pull notes and status
   rv$status_notes <- reactive(odbc::dbGetQuery(poolConn, "SELECT * FROM fieldwork.tbl_qaqc_status"))
-  
+
   # Data quarters for level data-populating the next fiscal quarter for a data point to compare with collection quarter
   level_data_quarter <- odbc::dbGetQuery(poolConn, "SELECT * FROM data.mat_level_data_quarter") %>%
     inner_join(fq, by = c("level_data_quarter" = "fiscal_quarter")) %>%
     mutate(next_quarter_uid = fiscal_quarter_lookup_uid + 1) %>%
     inner_join(fq, by = c("next_quarter_uid" = "fiscal_quarter_lookup_uid")) 
-    
+  
   # Data quarters for GW data-populating the next fiscal quarter for a data point to compare with collection quarter
   gw_data_quarter <- odbc::dbGetQuery(poolConn,"SELECT * FROM data.mat_gw_data_quarter") %>%
     inner_join(fq, by = c("gw_data_quarter" = "fiscal_quarter")) %>%
@@ -167,22 +167,53 @@ server <- function(input, output, session) {
   # qa_qc column looks at collection date; if no date, "No". If there is a date, looks at the ow suffix and data points in gw- or level- tables
   # the deployments are limited to level data for short- and long-term monitoring of level data (including green inlets and any other suffix in data.tbl_ow_leveldata_raw) and groundwater data in data.tbl_gw_depthdata_raw
   rv$collect_table_db <- reactive(odbc::dbGetQuery(poolConn, collect_query) %>%
-    mutate(fiscal_quarter = ifelse(collected_fiscal_quarter == "", expected_fiscal_quarter, collected_fiscal_quarter)) %>%
-    inner_join(fq, by = "fiscal_quarter") %>%
-    left_join(level_data_quarter, by = c("ow_uid","fiscal_quarter")) %>%
-    left_join(gw_data_quarter, by = c("ow_uid","fiscal_quarter")) %>%
-    mutate(gw = ifelse(ow_suffix == "GW1" | ow_suffix == "GW2" | ow_suffix == "GW3" | ow_suffix == "GW4" | ow_suffix == "GW5" | ow_suffix == "CW1", "Yes","No")) %>%
-    mutate(qa_qc = case_when(is.na(collection_dtime_est) ~ "No",
-                             gw == "Yes" ~ ifelse(is.na(gw_data_quarter),"No","Yes"),
-                             gw == "No" ~ ifelse(is.na(level_data_quarter),"No","Yes"))) %>%
-    mutate(collection_status = ifelse(is.na(collection_dtime_est), "Not Collected", as.character(collection_dtime_est))) %>%
-    left_join(rv$status_notes(), by = "deployment_uid") %>%
-    filter(sensor_purpose == 2 & long_term_lookup_uid %in% c(1, 2)) %>%
-    arrange(ow_suffix) %>%
-    arrange(desc(fiscal_quarter_lookup_uid)) %>%
-    arrange(desc(collection_dtime_est)) %>%
-    arrange(qa_qc)
+                                    mutate(fiscal_quarter = ifelse(collected_fiscal_quarter == "", expected_fiscal_quarter, collected_fiscal_quarter)) %>%
+                                    inner_join(fq, by = "fiscal_quarter") %>%
+                                    left_join(level_data_quarter, by = c("ow_uid","fiscal_quarter")) %>%
+                                    left_join(gw_data_quarter, by = c("ow_uid","fiscal_quarter")) %>%
+                                    mutate(gw = ifelse(ow_suffix == "GW1" | ow_suffix == "GW2" | ow_suffix == "GW3" | ow_suffix == "GW4" | ow_suffix == "GW5" | ow_suffix == "CW1", "Yes","No")) %>%
+                                    mutate(qa_qc = case_when(is.na(collection_dtime_est) ~ "No",
+                                                             gw == "Yes" ~ ifelse(is.na(gw_data_quarter),"No","Yes"),
+                                                             gw == "No" ~ ifelse(is.na(level_data_quarter),"No","Yes"))) %>%
+                                    mutate(collection_status = ifelse(is.na(collection_dtime_est), "Not Collected", as.character(collection_dtime_est))) %>%
+                                    left_join(rv$status_notes(), by = "deployment_uid") %>%
+                                    filter(sensor_purpose == 2 & long_term_lookup_uid %in% c(1, 2)) %>%
+                                    arrange(ow_suffix) %>%
+                                    arrange(desc(fiscal_quarter_lookup_uid)) %>%
+                                    arrange(desc(collection_dtime_est)) %>%
+                                    arrange(qa_qc)
   )
+  
+  
+  ### Change of logic to look at the current quarter for finding data points
+  
+  
+  # Data quarters for level data-populating the next fiscal quarter for a data point to compare with collection quarter
+  # level_data_quarter <- odbc::dbGetQuery(poolConn, "SELECT * FROM data.mat_level_data_quarter") %>%
+  #   mutate(fiscal_quarter = level_data_quarter)
+  # 
+  # # Data quarters for GW data-populating the next fiscal quarter for a data point to compare with collection quarter
+  # gw_data_quarter <- odbc::dbGetQuery(poolConn,"SELECT * FROM data.mat_gw_data_quarter") %>%
+  #   mutate(fiscal_quarter = gw_data_quarter)
+  # 
+  # rv$collect_table_db <- reactive(odbc::dbGetQuery(poolConn, collect_query) %>%
+  #                                   mutate(fiscal_quarter = ifelse(collected_fiscal_quarter == "", expected_fiscal_quarter, collected_fiscal_quarter)) %>%
+  #                                   inner_join(fq, by = "fiscal_quarter") %>%
+  #                                   left_join(level_data_quarter, by = c("ow_uid","fiscal_quarter")) %>%
+  #                                   left_join(gw_data_quarter, by = c("ow_uid","fiscal_quarter")) %>%
+  #                                   mutate(gw = ifelse(ow_suffix == "GW1" | ow_suffix == "GW2" | ow_suffix == "GW3" | ow_suffix == "GW4" | ow_suffix == "GW5" | ow_suffix == "CW1", "Yes","No")) %>%
+  #                                   mutate(qa_qc = case_when(is.na(collection_dtime_est) ~ "No",
+  #                                                            gw == "Yes" ~ ifelse(is.na(gw_data_quarter),"No","Yes"),
+  #                                                            gw == "No" ~ ifelse(is.na(level_data_quarter),"No","Yes"))) %>%
+  #                                   mutate(collection_status = ifelse(is.na(collection_dtime_est), "Not Collected", as.character(collection_dtime_est))) %>%
+  #                                   left_join(rv$status_notes(), by = "deployment_uid") %>%
+  #                                   filter(sensor_purpose == 2 & long_term_lookup_uid %in% c(1, 2)) %>%
+  #                                   arrange(ow_suffix) %>%
+  #                                   arrange(desc(fiscal_quarter_lookup_uid)) %>%
+  #                                   arrange(desc(collection_dtime_est)) %>%
+  #                                   arrange(qa_qc)
+  # )
+  # 
   
 
   rv$term_filter <- reactive(
