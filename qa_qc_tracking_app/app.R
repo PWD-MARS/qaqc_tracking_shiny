@@ -81,7 +81,7 @@ ui <- tagList(useShinyjs(), navbarPage("QA/QC Tracking App", id = "TabPanelID", 
                                                     selectInput("term_filter", "Term", choices = c("All" = 1.5, "Short" = 1, "Long"  = 2), selected = 1.5),
                                                     selectInput("f_q", "Collected/Expected Fiscal Quarter", choices = c("All", q_list), selected = current_fq),
                                                     conditionalPanel("input.deployments_rows_selected != 0",
-                                                                     selectInput("status", "Add/Edit QA/QC Status:", c("","Complete", "Needs Edit/Check", "Unresolved Issue with Data", "Partially Complete"), selected = NULL)),
+                                                                     selectInput("status", "Add/Edit QA/QC Status:", c("","Complete", "Needs Edit/Check", "Unresolved Issue with Data", "Missing/Stolen Sensor","Partially Complete"), selected = NULL)),
                                                     conditionalPanel("input.deployments_rows_selected != 0",
                                                                      selectInput("flagged", "Is the System Flagged for Issues?", c("", "Yes", "No"),  selected = NULL)),
                                                     #textAreaInput("qaqc_note", "Comments", height = '85px'),
@@ -238,7 +238,7 @@ server <- function(input, output, session) {
   
   #select and rename columns to show in app
   rv$collect_table <- reactive(rv$collect_table_filter() %>%
-                                 select(`SMP ID` = smp_id, `OW Suffix`= ow_suffix, `Project Name` = project_name, Term = term, `Collection Date` = collection_status, `Data in DB?` = qa_qc, Status = status, `System Flagged?` = flagged, deployment_uid) %>%
+                                 select(`SMP ID` = smp_id, `OW Suffix`= ow_suffix, `Project Name` = project_name, Term = term, `Collection Date` = collection_status, `Data in DB?` = qa_qc, `QA/QC Status` = status, `System Flagged?` = flagged, deployment_uid) %>%
                                  distinct()#, Notes =  qaqc_notes)
   )
                           
@@ -310,7 +310,7 @@ server <- function(input, output, session) {
               height = 1150,
               columns = list(
                 #`System ID` = colDef(width = 90),
-                `SMP ID` = colDef(width = 85),
+                `SMP ID` = colDef(width = 95),
                 `OW Suffix` = colDef(width = 100),
                 `Project Name` = colDef(width = 350),
                  Term = colDef(width = 75),
@@ -325,20 +325,23 @@ server <- function(input, output, session) {
                   }
                   list(backgroundColor = color, color = textColor, fontweight = "bold")
                 }),
-                `Status` = colDef(width = 230, style = function(value){
-                  if(!is.na(value) & value == "Complete"){
+                `QA/QC Status`  = colDef(width = 220, style = function(value){
+                  if (!is.na(value) & value == "Complete"){
                     color = "green"
                     textColor = "white"
-                  }else if(is.na(value)){
+                  } else if(is.na(value)){
                     color = "white"
                     textColor = "black"
-                  }else if (value == "Needs Edit/Check"){
+                  } else if (value == "Needs Edit/Check"){
                     color = "lightgreen"
                     textColor = "black"
-                  }else if (value == "Unresolved Issue with Data"){
+                  } else if (value == "Unresolved Issue with Data"){
                     color = "red"
                     textColor = "white"
-                  }else{
+                  } else if (value == "Missing/Stolen Sensor"){
+                    color = "purple"
+                    textColor = "white"
+                  } else{
                     color = "orange"
                     textColor = "black"
                   }
