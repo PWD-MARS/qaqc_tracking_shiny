@@ -36,7 +36,6 @@ library(shinipsum)
 #set default page length for datatables
 options(DT.options = list(pageLength = 25))
 
-
 #set db connection
 #using a pool connection so separate connnections are unified
 #gets environmental variables saved in local or pwdrstudio environment
@@ -59,17 +58,14 @@ q_list <- fq %>%
   select(fiscal_quarter) %>%
   pull
 
-
 # #replace special characters with friendlier characters
 special_char_replace <- function(note){
   
   note_fix <- note %>%
     str_replace_all(c("•" = "-", "ï‚§" = "-", "“" = '"', '”' = '"'))
-  
   return(note_fix)
   
 }
-
 
 # Define UI
 ui <- tagList(useShinyjs(), navbarPage("QA/QC Tracking App", id = "TabPanelID", theme = shinytheme("flatly"),
@@ -86,6 +82,8 @@ ui <- tagList(useShinyjs(), navbarPage("QA/QC Tracking App", id = "TabPanelID", 
                                                     selectInput("f_q", "Collected/Expected Fiscal Quarter", choices = c("All", q_list), selected = current_fq),
                                                     conditionalPanel("input.deployments_rows_selected != 0",
                                                                      selectInput("status", "Add/Edit QA/QC Status:", c("","Complete", "Needs Edit/Check", "Unresolved Issue with Data", "Partially Complete"), selected = NULL)),
+                                                    conditionalPanel("input.deployments_rows_selected != 0",
+                                                                     selectInput("flagged", "Is the System Flagged for Issues?", c("", "Yes" = "1", "No" = "2"),  selected = NULL)),
                                                     #textAreaInput("qaqc_note", "Comments", height = '85px'),
                                                     conditionalPanel("input.deployments_rows_selected != 0",
                                                                      textAreaInput("qaqc_comments", "Add/Edit Additional Comments:", height = '85px')),
@@ -94,8 +92,6 @@ ui <- tagList(useShinyjs(), navbarPage("QA/QC Tracking App", id = "TabPanelID", 
                                                     actionButton("update_button", "Update", icon("paper-plane"), 
                                                                  style="color: #fff; background-color: #337ab7; border-color: #2e6da4"),
                                                     width = 3
-                                                    
-                                                    
                                                 ),
                                                 mainPanel(
                                                   #DTOutput("deployments"),
@@ -108,23 +104,18 @@ ui <- tagList(useShinyjs(), navbarPage("QA/QC Tracking App", id = "TabPanelID", 
 )
 )
                                   
-
 # Server logic
 server <- function(input, output, session) {
   
   rv <- reactiveValues()  
   
-
   #process text field to prevent sql injection
   rv$reason_step <- reactive(gsub('\'', '\'\'',  input$qaqc_comments))
   rv$input_note  <- reactive(special_char_replace(rv$reason_step()))
   
-  
   #toggle state for the update button
   observe(toggleState(id = "update_button", condition = !is.null(input$deployments_rows_selected) & input$status != ""))
-  
   selected_row <- reactiveVal()
-  
   
   # Update the values in the drop-down menus when a row is selected
   observeEvent(input$deployments_rows_selected, {
@@ -137,63 +128,27 @@ server <- function(input, output, session) {
       
       updateTextAreaInput(session, "qaqc_comments", value = rv$collect_table_filter()$qaqc_notes[row])
       updateSelectInput(session, "status", selected = rv$collect_table_filter()$status[row])
+      updateSelectInput(session, "glagged", selected = rv$collect_table_filter()$flagged[row])
       
- 
+      
     }
   })
   
   #query the collection calendar and arrange by deployment_uid
-  collect_query <- "select *, data.fun_date_to_fiscal_quarter(cast(date_100percent AS DATE)) as expected_fiscal_quarter, data.fun_date_to_fiscal_quarter(cast(collection_dtime_est AS DATE)) as collected_fiscal_quarter from fieldwork.viw_qaqc_deployments"
-  
+  collect_query <- "select *, admin.fun_smp_to_system(smp_id) as system_id ,data.fun_date_to_fiscal_quarter(cast(date_100percent AS DATE)) as expected_fiscal_quarter, data.fun_date_to_fiscal_quarter(cast(collection_dtime_est AS DATE)) as collected_fiscal_quarter from fieldwork.viw_qaqc_deployments"
   
   # pull notes and status
   rv$status_notes <- reactive(odbc::dbGetQuery(poolConn, "SELECT * FROM fieldwork.tbl_qaqc_status"))
+  
+  # pull flagged systems
+  rv$flagged_system <- reactive(odbc::dbGetQuery(poolConn, "SELECT * FROM fieldwork.tbl_flagged_systems"))
 
-  # # Data quarters for level data-populating the next fiscal quarter for a data point to compare with collection quarter
-  # level_data_quarter <- odbc::dbGetQuery(poolConn, "SELECT * FROM data.mat_level_data_quarter") %>%
-  #   inner_join(fq, by = c("level_data_quarter" = "fiscal_quarter")) %>%
-  #   mutate(next_quarter_uid = fiscal_quarter_lookup_uid + 1) %>%
-  #   inner_join(fq, by = c("next_quarter_uid" = "fiscal_quarter_lookup_uid")) 
-  # 
-  # # Data quarters for GW data-populating the next fiscal quarter for a data point to compare with collection quarter
-  # gw_data_quarter <- odbc::dbGetQuery(poolConn,"SELECT * FROM data.mat_gw_data_quarter") %>%
-  #   inner_join(fq, by = c("gw_data_quarter" = "fiscal_quarter")) %>%
-  #   mutate(next_quarter_uid = fiscal_quarter_lookup_uid + 1) %>%
-  #   inner_join(fq, by = c("next_quarter_uid" = "fiscal_quarter_lookup_uid")) 
-  # 
-  # # If sensor is collected, fiscal_quarter column is the quarter it was collected. If not collected, fiscal_quarter is the the quarter associated with the 100%-full date. 
-  # # If OW suffix is GW- or CW1, the app looks at gw_data_quarter to find at least one data point in the past quarter
-  # # if NOT  GW- or CW1, the app looks at level_data_quarter to find at least one data point in the past quarter
-  # # qa_qc column looks at collection date; if no date, "No". If there is a date, looks at the ow suffix and data points in gw- or level- tables
-  # # the deployments are limited to level data for short- and long-term monitoring of level data (including green inlets and any other suffix in data.tbl_ow_leveldata_raw) and groundwater data in data.tbl_gw_depthdata_raw
-  # rv$collect_table_db <- reactive(odbc::dbGetQuery(poolConn, collect_query) %>%
-  #                                   mutate(fiscal_quarter = ifelse(collected_fiscal_quarter == "", expected_fiscal_quarter, collected_fiscal_quarter)) %>%
-  #                                   inner_join(fq, by = "fiscal_quarter") %>%
-  #                                   left_join(level_data_quarter, by = c("ow_uid","fiscal_quarter")) %>%
-  #                                   left_join(gw_data_quarter, by = c("ow_uid","fiscal_quarter")) %>%
-  #                                   mutate(gw = ifelse(ow_suffix == "GW1" | ow_suffix == "GW2" | ow_suffix == "GW3" | ow_suffix == "GW4" | ow_suffix == "GW5" | ow_suffix == "CW1", "Yes","No")) %>%
-  #                                   mutate(qa_qc = case_when(is.na(collection_dtime_est) ~ "No",
-  #                                                            gw == "Yes" ~ ifelse(is.na(gw_data_quarter),"No","Yes"),
-  #                                                            gw == "No" ~ ifelse(is.na(level_data_quarter),"No","Yes"))) %>%
-  #                                   mutate(collection_status = ifelse(is.na(collection_dtime_est), "Not Collected", as.character(collection_dtime_est))) %>%
-  #                                   left_join(rv$status_notes(), by = "deployment_uid") %>%
-  #                                   filter(sensor_purpose == 2 & long_term_lookup_uid %in% c(1, 2)) %>%
-  #                                   arrange(ow_suffix) %>%
-  #                                   arrange(desc(fiscal_quarter_lookup_uid)) %>%
-  #                                   arrange(desc(collection_dtime_est)) %>%
-  #                                   arrange(qa_qc)
-  # )
-  # 
-  # 
-  # 
   # Data day for level
   level_data_day <- odbc::dbGetQuery(poolConn, "SELECT * FROM data.mat_level_data_day") %>%
     mutate(level_data_exist = "Yes")
   # Data day for gw
   gw_data_day <- odbc::dbGetQuery(poolConn,"SELECT * FROM data.mat_gw_data_day") %>%
     mutate(gw_data_exist = "Yes")
-  
-  
   
   rv$collect_table_db <- reactive( odbc::dbGetQuery(poolConn, collect_query) %>%
     mutate(fiscal_quarter = ifelse(collected_fiscal_quarter == "", expected_fiscal_quarter, collected_fiscal_quarter)) %>%
@@ -207,50 +162,13 @@ server <- function(input, output, session) {
                              gw == "No" ~ ifelse(is.na(level_data_exist),"No","Yes"))) %>%
     mutate(collection_status = ifelse(is.na(collection_dtime_est), "Not Collected", as.character(collection_dtime_est))) %>%
     left_join(rv$status_notes(), by = "deployment_uid") %>%
+    left_join(rv$flagged_system(), by = "system_id") %>%
                                         filter(sensor_purpose == 2 & long_term_lookup_uid %in% c(1, 2)) %>%
                                         arrange(ow_suffix) %>%
                                         arrange(desc(fiscal_quarter_lookup_uid)) %>%
                                         arrange(desc(collection_dtime_est)) %>%
                                         arrange(qa_qc)
-
   )
-    
-  
-  ### Change of logic to look at the current quarter for finding data points
-  
-  
-  # Data quarters for level data-populating the next fiscal quarter for a data point to compare with collection quarter
-  # level_data_quarter <- odbc::dbGetQuery(poolConn, "SELECT * FROM data.mat_level_data_quarter") %>%
-  #   mutate(fiscal_quarter = level_data_quarter)
-  # 
-  # # Data quarters for GW data-populating the next fiscal quarter for a data point to compare with collection quarter
-  # gw_data_quarter <- odbc::dbGetQuery(poolConn,"SELECT * FROM data.mat_gw_data_quarter") %>%
-  #   mutate(fiscal_quarter = gw_data_quarter)
-  # 
-  # rv$collect_table_db <- reactive(odbc::dbGetQuery(poolConn, collect_query) %>%
-  #                                   mutate(fiscal_quarter = ifelse(collected_fiscal_quarter == "", expected_fiscal_quarter, collected_fiscal_quarter)) %>%
-  #                                   inner_join(fq, by = "fiscal_quarter") %>%
-  #                                   left_join(level_data_quarter, by = c("ow_uid","fiscal_quarter")) %>%
-  #                                   left_join(gw_data_quarter, by = c("ow_uid","fiscal_quarter")) %>%
-  #                                   mutate(gw = ifelse(ow_suffix == "GW1" | ow_suffix == "GW2" | ow_suffix == "GW3" | ow_suffix == "GW4" | ow_suffix == "GW5" | ow_suffix == "CW1", "Yes","No")) %>%
-  #                                   mutate(qa_qc = case_when(is.na(collection_dtime_est) ~ "No",
-  #                                                            gw == "Yes" ~ ifelse(is.na(gw_data_quarter),"No","Yes"),
-  #                                                            gw == "No" ~ ifelse(is.na(level_data_quarter),"No","Yes"))) %>%
-  #                                   mutate(collection_status = ifelse(is.na(collection_dtime_est), "Not Collected", as.character(collection_dtime_est))) %>%
-  #                                   left_join(rv$status_notes(), by = "deployment_uid") %>%
-  #                                   filter(sensor_purpose == 2 & long_term_lookup_uid %in% c(1, 2)) %>%
-  #                                   arrange(ow_suffix) %>%
-  #                                   arrange(desc(fiscal_quarter_lookup_uid)) %>%
-  #                                   arrange(desc(collection_dtime_est)) %>%
-  #                                   arrange(qa_qc)
-  # )
-  # 
-  
-  
-  
-  
-  
-  
 
   rv$term_filter <- reactive(
     if(input$term_filter == 1.5){
@@ -259,8 +177,6 @@ server <- function(input, output, session) {
       input$term_filter
     }
   )
-  
-  
   
   rv$smp_filter <- reactive(
     if(input$smp_id == "All"){
@@ -272,7 +188,6 @@ server <- function(input, output, session) {
 
   #rv$purpose_filter <- reactive(if(input$purpose_filter == 1.5){c(0, 1, 2, 3)} else {input$purpose_filter})
   rv$quarter <- reactive(if(input$f_q == "All"){q_list} else {input$f_q})
-  
 
   #arrange and filtered the collection calendar
   rv$collect_table_filter <- reactive(rv$collect_table_db() %>% 
@@ -296,29 +211,12 @@ server <- function(input, output, session) {
                                       
                                         ) 
   
-  
-  
   #select and rename columns to show in app
   rv$collect_table <- reactive(rv$collect_table_filter() %>%
-                                 select(`SMP ID` = smp_id, `OW Suffix`= ow_suffix, `Project Name` = project_name, Term = term,`Collected/Expected Quarter` = fiscal_quarter, `Collection Date` = collection_status, `Data in DB?` = qa_qc, Status = status, deployment_uid) %>%
+                                 select(`SMP ID` = smp_id, `OW Suffix`= ow_suffix, `Project Name` = project_name, Term = term,`Collected/Expected Quarter` = fiscal_quarter, `Collection Date` = collection_status, `Data in DB?` = qa_qc, Status = status, flagged, deployment_uid) %>%
                                  distinct()#, Notes =  qaqc_notes)
   )
-                                  
-
-  # Update the values in the drop-down menus when a row is selected
-  observeEvent(input$deployments_rows_selected, {
-    # Get the selected row
-    row <- input$deployments_rows_selected
-    
-    # Update the reactive value
-    if (!is.null(row) && length(row) > 0) {
-    
-    }
-  })
-  
-  
-  
-  
+                          
   observeEvent(input$update_button, {
     row <- input$deployments_rows_selected
     #if(is.na(rv$collect_table_filter()$qaqc_notes[row]) & is.na(rv$collect_table_filter()$status[row])) {
@@ -336,13 +234,17 @@ server <- function(input, output, session) {
           "Update fieldwork.tbl_qaqc_status SET status ='", input$status,"', qaqc_notes = '", rv$input_note(), "' where deployment_uid = ", rv$collect_table_filter()$deployment_uid[row])
         odbc::dbGetQuery(poolConn, edit_query)
         
-        
       } else {
         delete_query <- paste0(
           "delete from fieldwork.tbl_qaqc_status where deployment_uid = ", rv$collect_table_filter()$deployment_uid[row])
         odbc::dbGetQuery(poolConn, delete_query)
-        
+ 
       }
+    
+    # update flagged status
+   
+    
+    
     
     
     # re-run notes and status
@@ -351,13 +253,9 @@ server <- function(input, output, session) {
     reset("status")
     reset("qaqc_comments")
     
-    
-    
-    
   }
   )
     
-  
   output$deployments <- renderReactable(
     reactable(rv$collect_table() %>%
                 select(-deployment_uid), 
@@ -429,9 +327,6 @@ server <- function(input, output, session) {
   
               )
     )
-
-  
-  
   
 }
 
