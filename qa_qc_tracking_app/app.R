@@ -95,6 +95,7 @@ ui <- tagList(useShinyjs(), navbarPage("QA/QC Tracking App", id = "TabPanelID", 
                                                 ),
                                                 mainPanel(
                                                   #DTOutput("deployments"),
+                                                  strong(span(textOutput("table_name"), style = "font-size:22px")),
                                                   reactableOutput("deployments"),
                                                   width = 9
                                                   
@@ -106,8 +107,31 @@ ui <- tagList(useShinyjs(), navbarPage("QA/QC Tracking App", id = "TabPanelID", 
                                   
 # Server logic
 server <- function(input, output, session) {
-  
   rv <- reactiveValues()  
+  
+  #get quarters as dates
+  rv$start_quarter <- reactive(case_when(str_sub(input$f_q, 5, 7) == "Q3" ~ "1/1", 
+                                                 str_sub(input$f_q, 5, 7) == "Q4" ~ "4/1", 
+                                                 str_sub(input$f_q, 5, 7) == "Q1" ~ "7/1", 
+                                                 str_sub(input$f_q, 5, 7) == "Q2" ~ "10/1"))
+  
+  rv$end_quarter <- reactive(case_when(str_sub(input$f_q, 5, 7) == "Q3" ~ "3/31", 
+                                               str_sub(input$f_q, 5, 7) == "Q4" ~ "6/30", 
+                                               str_sub(input$f_q, 5, 7) == "Q1" ~ "9/30", 
+                                               str_sub(input$f_q, 5, 7) == "Q2" ~ "12/31"))
+  
+  # parse the year component from this format "FY24Q2"
+  rv$year <- reactive(str_sub(input$f_q, 3, 4))
+  
+  
+  
+  #convert FY/Quarter to a real date for postcon tab
+  rv$start_date <- reactive(lubridate::mdy(paste0(rv$start_quarter(), "/", ifelse(str_sub(input$f_q, 5, 7) == "Q1" | str_sub(input$f_q, 5, 7) == "Q2", as.numeric(rv$year())-1, rv$year()))))
+  rv$end_date <- reactive(lubridate::mdy(paste0(rv$end_quarter(), "/", ifelse(str_sub(input$f_q, 5, 7) == "Q1" | str_sub(input$f_q, 5, 7) == "Q2", as.numeric(rv$year())-1, rv$year()))))
+  
+  output$table_name <- renderText(paste("Short/Long-Term Deployments of Water level Sessors Collected or Expected to be Collected in ", input$f_q,"; ","(", rv$start_date(), " to ",  rv$end_date(),")" , ": ", sep = ""))
+  
+
   
   #process text field to prevent sql injection
   rv$reason_step <- reactive(gsub('\'', '\'\'',  input$qaqc_comments))
@@ -214,7 +238,7 @@ server <- function(input, output, session) {
   
   #select and rename columns to show in app
   rv$collect_table <- reactive(rv$collect_table_filter() %>%
-                                 select(`SMP ID` = smp_id, `OW Suffix`= ow_suffix, `Project Name` = project_name, Term = term,`Collected/Expected Quarter` = fiscal_quarter, `Collection Date` = collection_status, `Data in DB?` = qa_qc, Status = status, `System Flagged?` = flagged, deployment_uid) %>%
+                                 select(`SMP ID` = smp_id, `OW Suffix`= ow_suffix, `Project Name` = project_name, Term = term, `Collection Date` = collection_status, `Data in DB?` = qa_qc, Status = status, `System Flagged?` = flagged, deployment_uid) %>%
                                  distinct()#, Notes =  qaqc_notes)
   )
                           
@@ -290,7 +314,7 @@ server <- function(input, output, session) {
                 `OW Suffix` = colDef(width = 100),
                 `Project Name` = colDef(width = 350),
                  Term = colDef(width = 75),
-                `Collected/Expected Quarter` = colDef(width = 225),
+                #`Collected/Expected Quarter` = colDef(width = 225),
                 `Collection Date` = colDef(width = 125, style = function(value){
                   if(value == "Not Collected"){
                     color = "yellow"
@@ -330,7 +354,7 @@ server <- function(input, output, session) {
                   }
                   list(backgroundColor = color, color = textColor, fontweight = "bold")
                 }),
-                `System Flagged?` = colDef(width = 230, style = function(value){
+                `System Flagged?` = colDef(width = 200, style = function(value){
                   if(!is.na(value) & value == "No"){
                     color = "green"
                     textColor = "white"
