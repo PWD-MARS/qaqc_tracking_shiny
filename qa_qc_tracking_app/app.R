@@ -83,12 +83,12 @@ ui <- tagList(useShinyjs(), navbarPage("QA/QC Tracking App", id = "TabPanelID", 
                                                     conditionalPanel("input.deployments_rows_selected != 0",
                                                                      selectInput("status", "Add/Edit QA/QC Status:", c("","Complete", "Needs Edit/Check", "Unresolved Issue with Data", "Partially Complete"), selected = NULL)),
                                                     conditionalPanel("input.deployments_rows_selected != 0",
-                                                                     selectInput("flagged", "Is the System Flagged for Issues?", c("", "Yes" = "1", "No" = "2"),  selected = NULL)),
+                                                                     selectInput("flagged", "Is the System Flagged for Issues?", c("", "Yes", "No"),  selected = NULL)),
                                                     #textAreaInput("qaqc_note", "Comments", height = '85px'),
                                                     conditionalPanel("input.deployments_rows_selected != 0",
                                                                      textAreaInput("qaqc_comments", "Add/Edit Additional Comments:", height = '85px')),
                                                     conditionalPanel("input.deployments_rows_selected != 0",
-                                                                     h6("You Must Pick a QA/QC Status for the Deployment to be Able to Edit!")),
+                                                                     h6("You Must Pick a QA/QC & Flag Status for the Deployment to be Able to Edit!")),
                                                     actionButton("update_button", "Update", icon("paper-plane"), 
                                                                  style="color: #fff; background-color: #337ab7; border-color: #2e6da4"),
                                                     width = 3
@@ -114,7 +114,7 @@ server <- function(input, output, session) {
   rv$input_note  <- reactive(special_char_replace(rv$reason_step()))
   
   #toggle state for the update button
-  observe(toggleState(id = "update_button", condition = !is.null(input$deployments_rows_selected) & input$status != ""))
+  observe(toggleState(id = "update_button", condition = !is.null(input$deployments_rows_selected) & input$status != "" & input$flagged != ""))
   selected_row <- reactiveVal()
   
   # Update the values in the drop-down menus when a row is selected
@@ -128,7 +128,7 @@ server <- function(input, output, session) {
       
       updateTextAreaInput(session, "qaqc_comments", value = rv$collect_table_filter()$qaqc_notes[row])
       updateSelectInput(session, "status", selected = rv$collect_table_filter()$status[row])
-      updateSelectInput(session, "glagged", selected = rv$collect_table_filter()$flagged[row])
+      updateSelectInput(session, "flagged", selected = rv$collect_table_filter()$flagged[row])
       
       
     }
@@ -163,6 +163,7 @@ server <- function(input, output, session) {
     mutate(collection_status = ifelse(is.na(collection_dtime_est), "Not Collected", as.character(collection_dtime_est))) %>%
     left_join(rv$status_notes(), by = "deployment_uid") %>%
     left_join(rv$flagged_system(), by = "system_id") %>%
+    mutate(flagged = ifelse(flagged == 1, "Yes", "No")) %>%  
                                         filter(sensor_purpose == 2 & long_term_lookup_uid %in% c(1, 2)) %>%
                                         arrange(ow_suffix) %>%
                                         arrange(desc(fiscal_quarter_lookup_uid)) %>%
@@ -213,7 +214,7 @@ server <- function(input, output, session) {
   
   #select and rename columns to show in app
   rv$collect_table <- reactive(rv$collect_table_filter() %>%
-                                 select(`SMP ID` = smp_id, `OW Suffix`= ow_suffix, `Project Name` = project_name, Term = term,`Collected/Expected Quarter` = fiscal_quarter, `Collection Date` = collection_status, `Data in DB?` = qa_qc, Status = status, flagged, deployment_uid) %>%
+                                 select(`SMP ID` = smp_id, `OW Suffix`= ow_suffix, `Project Name` = project_name, Term = term,`Collected/Expected Quarter` = fiscal_quarter, `Collection Date` = collection_status, `Data in DB?` = qa_qc, Status = status, `System Flagged?` = flagged, deployment_uid) %>%
                                  distinct()#, Notes =  qaqc_notes)
   )
                           
@@ -241,17 +242,31 @@ server <- function(input, output, session) {
  
       }
     
-    # update flagged status
+    # update flagged status based on rv$flagged_system() 
    
+    if(rv$collect_table_filter()$system_id[row] %!in% rv$flagged_system()$system_id) {
+      new_flag <- data.frame(system_id = rv$collect_table_filter()$system_id[row],
+                             flagged = ifelse(input$flagged == "Yes", 1, 0))
+      
+      odbc::dbWriteTable(poolConn, Id(schema = "fieldwork", table = "tbl_flagged_systems"), new_flag, append= TRUE, row.names = FALSE )
+      
+    } else {
+      
+      edit_flag <- paste0(
+        "Update fieldwork.tbl_flagged_systems SET flagged = ", ifelse(input$flagged == "Yes", TRUE, FALSE), " where system_id = '", rv$collect_table_filter()$system_id[row],"'")
+      odbc::dbGetQuery(poolConn, edit_flag)
+      
+    }
     
     
-    
-    
-    # re-run notes and status
+    # re-run notes and status, and flags
     rv$status_notes <- reactive(odbc::dbGetQuery(poolConn, "SELECT * FROM fieldwork.tbl_qaqc_status"))
+    rv$flagged_system <- reactive(odbc::dbGetQuery(poolConn, "SELECT * FROM fieldwork.tbl_flagged_systems"))
+    
     
     reset("status")
     reset("qaqc_comments")
+    reset("flagged")
     
   }
   )
@@ -311,6 +326,19 @@ server <- function(input, output, session) {
                     textColor = "black"
                   }else{
                     color = "green"
+                    textColor = "white"
+                  }
+                  list(backgroundColor = color, color = textColor, fontweight = "bold")
+                }),
+                `System Flagged?` = colDef(width = 230, style = function(value){
+                  if(!is.na(value) & value == "No"){
+                    color = "green"
+                    textColor = "white"
+                  }else if(is.na(value)){
+                    color = "white"
+                    textColor = "black"
+                  }else{
+                    color = "red"
                     textColor = "white"
                   }
                   list(backgroundColor = color, color = textColor, fontweight = "bold")
