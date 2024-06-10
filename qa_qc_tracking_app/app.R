@@ -129,7 +129,7 @@ server <- function(input, output, session) {
   rv$start_date <- reactive(lubridate::mdy(paste0(rv$start_quarter(), "/", ifelse(str_sub(input$f_q, 5, 7) == "Q1" | str_sub(input$f_q, 5, 7) == "Q2", as.numeric(rv$year())-1, rv$year()))))
   rv$end_date <- reactive(lubridate::mdy(paste0(rv$end_quarter(), "/", ifelse(str_sub(input$f_q, 5, 7) == "Q1" | str_sub(input$f_q, 5, 7) == "Q2", as.numeric(rv$year())-1, rv$year()))))
   
-  output$table_name <- renderText(paste("Short/Long-Term Deployments of Water level Sessors Collected or Expected to be Collected in ", input$f_q,"; ","(", rv$start_date(), " to ",  rv$end_date(),")" , ": ", sep = ""))
+  output$table_name <- renderText(paste("Short/Long-Term Deployments of Water level Sensors Collected or Expected to be Collected in ", input$f_q,"; ","(", rv$start_date(), " to ",  rv$end_date(),")" , ": ", sep = ""))
   
 
   
