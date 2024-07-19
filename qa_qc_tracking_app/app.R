@@ -368,7 +368,7 @@ server <- function(input, output, session) {
                   }
                   list(backgroundColor = color, color = textColor, fontweight = "bold")
                 }),
-                `Flagged?` = colDef(width = 75, style = function(value){
+                `Flagged?` = colDef(width = 85, style = function(value){
                   if(!is.na(value) & value == "No"){
                     color = "green"
                     textColor = "white"
