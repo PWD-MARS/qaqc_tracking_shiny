@@ -160,7 +160,7 @@ server <- function(input, output, session) {
   
   #query the collection calendar and arrange by deployment_uid
   collect_query <- "select *, admin.fun_smp_to_system(smp_id) as system_id ,data.fun_date_to_fiscal_quarter(cast(date_100percent AS DATE)) as expected_fiscal_quarter, data.fun_date_to_fiscal_quarter(cast(collection_dtime_est AS DATE)) as collected_fiscal_quarter from fieldwork.viw_qaqc_deployments"
-  
+
   # pull notes and status
   rv$status_notes <- reactive(odbc::dbGetQuery(poolConn, "SELECT * FROM fieldwork.tbl_qaqc_status"))
   
@@ -173,7 +173,8 @@ server <- function(input, output, session) {
   # Data day for gw
   gw_data_day <- odbc::dbGetQuery(poolConn,"SELECT * FROM data.mat_gw_data_day") %>%
     mutate(gw_data_exist = "Yes")
-  
+
+  # populating the main table
   rv$collect_table_db <- reactive( odbc::dbGetQuery(poolConn, collect_query) %>%
     mutate(fiscal_quarter = ifelse(collected_fiscal_quarter == "", expected_fiscal_quarter, collected_fiscal_quarter)) %>%
     inner_join(fq, by = "fiscal_quarter") %>%
@@ -297,7 +298,7 @@ server <- function(input, output, session) {
     
   output$deployments <- renderReactable(
     reactable(rv$collect_table() %>%
-                select(-deployment_uid), 
+                select(-deployment_uid),
               fullWidth = TRUE,
               selection = "single",
               searchable = TRUE,
@@ -379,7 +380,7 @@ server <- function(input, output, session) {
                                ), outlined = TRUE)
                 )
               }
-  
+
               )
     )
   
