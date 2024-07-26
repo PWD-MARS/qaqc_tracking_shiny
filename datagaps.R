@@ -27,6 +27,7 @@ options(DT.options = list(pageLength = 25))
 #gets environmental variables saved in local or pwdrstudio environment
 poolConn <- dbPool(odbc(), dsn = "mars14_datav2", uid = Sys.getenv("shiny_uid"), pwd = Sys.getenv("shiny_pwd"))
 
+data_gaps_current <- odbc::dbGetQuery(poolConn, "SELECT * FROM data.tbl_datagaps")
 
 #query the collection calendar and arrange by deployment_uid
 collect_query <- "select *, admin.fun_smp_to_system(smp_id) as system_id ,data.fun_date_to_fiscal_quarter(cast(date_100percent AS DATE)) as expected_fiscal_quarter, data.fun_date_to_fiscal_quarter(cast(collection_dtime_est AS DATE)) as collected_fiscal_quarter from fieldwork.viw_qaqc_deployments"
@@ -85,6 +86,9 @@ deployments_df <- deployments_df %>%
 
 # prep and write to db
 datagaps <- deployments_df %>%
-  select(deployment_uid, datagap_days)
+  select(deployment_uid, datagap_days) %>%
+  anti_join(data_gaps_current, by = "deployment_uid")
 
+
+# write to DB
 dbWriteTable(poolConn, Id(schema = "data", table = "tbl_datagaps"), datagaps, append= TRUE, row.names = FALSE )
