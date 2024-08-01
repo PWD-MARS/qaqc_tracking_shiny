@@ -89,11 +89,12 @@ datagaps <- deployments_df %>%
   select(deployment_uid, datagap_days) %>%
   anti_join(data_gaps_current, by = c("deployment_uid","datagap_days"))
 
-
-# delete values that have changed 
-sql_string <- "delete from data.tbl_datagaps WHERE deployment_uid = %s;"
-dbSendStatement(con, paste(sprintf(sql_string, datagaps$deployment_uid), collapse=""))
-
-
-# write the new data and data with updated values to DB
-dbWriteTable(con, Id(schema = "data", table = "tbl_datagaps"), datagaps, append= TRUE, row.names = FALSE )
+if(nrow(datagaps) > 0){
+  
+  # delete values that have changed 
+  sql_string <- "delete from data.tbl_datagaps WHERE deployment_uid = %s;"
+  dbSendStatement(con, paste(sprintf(sql_string, datagaps$deployment_uid), collapse=""))
+  # write the new data and data with updated values to DB
+  dbWriteTable(con, Id(schema = "data", table = "tbl_datagaps"), datagaps, append= TRUE, row.names = FALSE )
+  
+}
