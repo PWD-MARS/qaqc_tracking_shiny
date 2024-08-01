@@ -25,13 +25,13 @@ options(DT.options = list(pageLength = 25))
 #set db connection
 #using a pool connection so separate connnections are unified
 #gets environmental variables saved in local or pwdrstudio environment
-poolConn <- dbPool(odbc(), dsn = "mars14_datav2", uid = Sys.getenv("shiny_uid"), pwd = Sys.getenv("shiny_pwd"))
+con <- dbConnect(odbc(), dsn = "mars14_datav2", uid = Sys.getenv("shiny_uid"), pwd = Sys.getenv("shiny_pwd"))
 
-data_gaps_current <- odbc::dbGetQuery(poolConn, "SELECT * FROM data.tbl_datagaps")
+data_gaps_current <- odbc::dbGetQuery(con, "SELECT * FROM data.tbl_datagaps")
 
 #query the collection calendar and arrange by deployment_uid
 collect_query <- "select *, admin.fun_smp_to_system(smp_id) as system_id ,data.fun_date_to_fiscal_quarter(cast(date_100percent AS DATE)) as expected_fiscal_quarter, data.fun_date_to_fiscal_quarter(cast(collection_dtime_est AS DATE)) as collected_fiscal_quarter from fieldwork.viw_qaqc_deployments"
-deployments_df <- odbc::dbGetQuery(poolConn, collect_query) %>%
+deployments_df <- odbc::dbGetQuery(con, collect_query) %>%
   select(smp_id, deployment_uid ,ow_uid, ow_suffix, deployment_dtime_est, collection_dtime_est, date_100percent, type, term) %>%
   filter(type == "LEVEL" & (term == "Short" | term == "Long")) %>%
   na.omit() %>%
@@ -42,10 +42,10 @@ deployments_df <- odbc::dbGetQuery(poolConn, collect_query) %>%
 
 
 # Data day for level
-level_data_day <- odbc::dbGetQuery(poolConn, "SELECT * FROM data.mat_level_data_day") %>%
+level_data_day <- odbc::dbGetQuery(con, "SELECT * FROM data.mat_level_data_day") %>%
   mutate(level_data_exist = "Yes")
 # Data day for gw
-gw_data_day <- odbc::dbGetQuery(poolConn,"SELECT * FROM data.mat_gw_data_day") %>%
+gw_data_day <- odbc::dbGetQuery(con,"SELECT * FROM data.mat_gw_data_day") %>%
   mutate(gw_data_exist = "Yes")
 
 
@@ -84,11 +84,16 @@ deployments_df <- deployments_df %>%
   }
 
 
-# prep and write to db
+# prep and write to db, look for new deployments and those with updated gapdays
 datagaps <- deployments_df %>%
   select(deployment_uid, datagap_days) %>%
-  anti_join(data_gaps_current, by = "deployment_uid")
+  anti_join(data_gaps_current, by = c("deployment_uid","datagap_days"))
 
 
-# write to DB
-dbWriteTable(poolConn, Id(schema = "data", table = "tbl_datagaps"), datagaps, append= TRUE, row.names = FALSE )
+# delete values that have changed 
+sql_string <- "delete from data.tbl_datagaps WHERE deployment_uid = %s;"
+dbSendStatement(con, paste(sprintf(sql_string, datagaps$deployment_uid), collapse=""))
+
+
+# write the new data and data with updated values to DB
+dbWriteTable(con, Id(schema = "data", table = "tbl_datagaps"), datagaps, append= TRUE, row.names = FALSE )
