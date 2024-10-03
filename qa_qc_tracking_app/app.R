@@ -31,7 +31,7 @@ library(shinipsum)
 #Not in logical
 `%!in%` <- Negate(`%in%`)
 
-#0.1: database connection and global options --------
+#0.1: database connection and global options 
 
 #set default page length for datatables
 options(DT.options = list(pageLength = 25))
@@ -69,7 +69,6 @@ special_char_replace <- function(note){
 
 # Define UI
 ui <- tagList(useShinyjs(), navbarPage("QA/QC Tracking App", id = "TabPanelID", theme = shinytheme("flatly"),
-                                       #1.1 Unmonitored Active SMPs -------
                                        tabPanel("Deployments QA/QC Status", value = "deployment_value", 
                                                 titlePanel("Level Sensor Deployments Table"),
                                                 sidebarLayout(
@@ -161,7 +160,11 @@ server <- function(input, output, session) {
     if (!is.null(row)) {
       selected_row(row)
       
-      updateTextAreaInput(session, "qaqc_comments", value = rv$collect_table_filter()$qaqc_notes[row])
+      rv$textbox_notes <- reactive(rv$status_notes()[rv$status_notes()$deployment_uid == rv$collect_table_filter()$deployment_uid[row], ] %>%
+        select(qaqc_notes) %>%
+          pull)
+      
+      updateTextAreaInput(session, "qaqc_comments", value = rv$textbox_notes())
       updateSelectInput(session, "status", selected = rv$collect_table_filter()$status[row])
       updateSelectInput(session, "flagged", selected = rv$collect_table_filter()$flagged[row])
       
@@ -262,13 +265,6 @@ server <- function(input, output, session) {
                                         distinct()
                                         ) 
   
-  #select and rename columns to show in app
-  rv$collect_table <- reactive(rv$collect_table_filter() %>%
-                                 select(`SMP ID` = smp_id, `OW Suffix`= ow_suffix, `Project Name` = project_name, Term = term, `Collection Date` = collection_status, `Data in DB?` = qa_qc, `QA/QC Status` = status, `Post-Con Status?` = postcon_exist, `Flagged?` = flagged, `Gap Days` = datagap_days ,deployment_uid) %>%
-                                 distinct()#, Notes =  qaqc_notes)
-  )
-  
-  
   observeEvent(input$update_button, {
    row <- getReactableState("deployments", "selected")
 
@@ -324,8 +320,9 @@ server <- function(input, output, session) {
   )
     
   output$deployments <- renderReactable(
-    reactable(rv$collect_table() %>%
-                select(-deployment_uid),
+    reactable(rv$collect_table_filter() %>%
+                select(`SMP ID` = smp_id, `OW Suffix`= ow_suffix, `Project Name` = project_name, Term = term, `Collection Date` = collection_status, `Data in DB?` = qa_qc, `QA/QC Status` = status, `Post-Con Status?` = postcon_exist, `Flagged?` = flagged, `Gap Days` = datagap_days ,deployment_uid, -deployment_uid) %>%
+                distinct(),
               fullWidth = TRUE,
               selection = "single",
               searchable = TRUE,
@@ -399,7 +396,7 @@ server <- function(input, output, session) {
                   list(backgroundColor = color, color = textColor, fontweight = "bold")
                 })),
               details = function(index) {
-                nested_notes <- rv$status_notes()[rv$status_notes()$deployment_uid == rv$collect_table()$deployment_uid[index], ] %>%
+                nested_notes <- rv$status_notes()[rv$status_notes()$deployment_uid == rv$collect_table_filter()$deployment_uid[index], ] %>%
                   select(Notes = qaqc_notes)
                 htmltools::div(style = "padding: 1rem",
                                reactable(nested_notes, columns = list(
