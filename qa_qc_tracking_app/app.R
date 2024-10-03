@@ -332,7 +332,6 @@ server <- function(input, output, session) {
               showPageSizeOptions = TRUE,
               pageSizeOptions = c(25, 50, 100),
               defaultPageSize = 25,
-              height = 1150,
               columns = list(
                 #`System ID` = colDef(width = 90),
                 `SMP ID` = colDef(width = 95),
