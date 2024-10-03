@@ -68,9 +68,8 @@ special_char_replace <- function(note){
 }
 
 # Define UI
-ui <- tagList(useShinyjs(), navbarPage("QA/QC Tracking App", id = "TabPanelID", theme = shinytheme("flatly"),
+ui <- tagList(useShinyjs(), navbarPage("QA/QC Tracking App", id = "TabPanelID", theme = shinytheme("cyborg"),
                                        tabPanel("Deployments QA/QC Status", value = "deployment_value", 
-                                                titlePanel("Level Sensor Deployments Table"),
                                                 sidebarLayout(
                                                   sidebarPanel(
                                                     selectInput("smp_id", "SMP ID", choices = c("All", data), selected = "All"),
@@ -323,6 +322,7 @@ server <- function(input, output, session) {
     reactable(rv$collect_table_filter() %>%
                 select(`SMP ID` = smp_id, `OW Suffix`= ow_suffix, `Project Name` = project_name, Term = term, `Collection Date` = collection_status, `Data in DB?` = qa_qc, `QA/QC Status` = status, `Post-Con Status?` = postcon_exist, `Flagged?` = flagged, `Gap Days` = datagap_days ,deployment_uid, -deployment_uid) %>%
                 distinct(),
+              theme = darkly(),
               fullWidth = TRUE,
               selection = "single",
               searchable = TRUE,
@@ -355,8 +355,8 @@ server <- function(input, output, session) {
                     color = "green"
                     textColor = "white"
                   } else if(is.na(value)){
-                    color = "white"
-                    textColor = "black"
+                    color = NULL
+                    textColor = NULL
                   } else if (value == "Needs Edit/Check"){
                     color = "lightgreen"
                     textColor = "black"
@@ -387,8 +387,8 @@ server <- function(input, output, session) {
                     color = "green"
                     textColor = "white"
                   }else if(is.na(value)){
-                    color = "white"
-                    textColor = "black"
+                    color = NULL
+                    textColor = NULL
                   }else{
                     color = "red"
                     textColor = "white"
@@ -399,7 +399,9 @@ server <- function(input, output, session) {
                 nested_notes <- rv$status_notes()[rv$status_notes()$deployment_uid == rv$collect_table_filter()$deployment_uid[index], ] %>%
                   select(Notes = qaqc_notes)
                 htmltools::div(style = "padding: 1rem",
-                               reactable(nested_notes, columns = list(
+                               reactable(nested_notes, 
+                                         theme = darkly(),
+                                         columns = list(
                                  Notes = colDef(width = 950)
                                ), outlined = TRUE)
                 )
