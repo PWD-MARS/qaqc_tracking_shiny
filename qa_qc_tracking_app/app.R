@@ -400,9 +400,7 @@ server <- function(input, output, session) {
                 htmltools::div(style = "padding: 1rem",
                                reactable(nested_notes, 
                                          theme = darkly(),
-                                         columns = list(
-                                 Notes = colDef(width = 950)
-                               ), outlined = TRUE)
+                                         outlined = TRUE)
                 )
               }
 
