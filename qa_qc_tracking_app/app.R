@@ -28,6 +28,8 @@ library(xlsx)
 library(DBI)
 # managing long notes in UI
 library(shinipsum)
+#package versioning
+library(renv)
 #Not in logical
 `%!in%` <- Negate(`%in%`)
 
