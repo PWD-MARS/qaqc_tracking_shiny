@@ -1,0 +1,12 @@
+name: mars_qaqc_tracking_app_100
+title: MARS QA/QC Tracking App 1.0.0
+username: farshad.ebrahimi
+account: farshad.ebrahimi
+server: pwdrstudio.phila.gov
+hostUrl: https://pwdrstudio.phila.gov/__api__
+appId: 396
+bundleId: 2974
+url: https://pwdrstudio.phila.gov/mars/qaqc/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE

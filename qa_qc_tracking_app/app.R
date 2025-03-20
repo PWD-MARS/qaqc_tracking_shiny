@@ -26,6 +26,8 @@ library(reactablefmtr)
 #excel download
 library(xlsx)
 library(DBI)
+# connection
+library(RPostgres)
 # managing long notes in UI
 library(shinipsum)
 #package versioning
@@ -41,7 +43,13 @@ options(DT.options = list(pageLength = 25))
 #set db connection
 #using a pool connection so separate connnections are unified
 #gets environmental variables saved in local or pwdrstudio environment
-poolConn <- dbPool(odbc(), dsn = "mars14_datav2", uid = Sys.getenv("shiny_uid"), pwd = Sys.getenv("shiny_pwd"))
+#poolConn <- dbPool(odbc(), dsn = "mars14_datav2", uid = Sys.getenv("shiny_uid"), pwd = Sys.getenv("shiny_pwd"))
+poolConn <- dbPool(RPostgres::Postgres(),
+                   dbname = 'mars_data', 
+                   host = 'PWDMARSDBS1', 
+                   port = 5434, 
+                   user = Sys.getenv("shiny_uid"),
+                   password = Sys.getenv("shiny_pwd"))
 
 data <- odbc::dbGetQuery(poolConn, paste0("select distinct smp_id from external.mat_assets")) %>% 
   dplyr::arrange(smp_id)
