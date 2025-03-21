@@ -94,7 +94,7 @@ ui <- tagList(useShinyjs(), navbarPage("QA/QC Tracking App", id = "TabPanelID", 
                                                                      selectInput("flagged", "Is the System Flagged for Issues?", c("", "Yes", "No"),  selected = NULL)),
                                                     #textAreaInput("qaqc_note", "Comments", height = '85px'),
                                                     conditionalPanel("input.deployments_rows_selected != 0",
-                                                                     textAreaInput("qaqc_comments", "Add/Edit Additional Comments:", height = '85px')),
+                                                                     textAreaInput("qaqc_comments", "Add/Edit Additional Comments:", height = '120px')),
                                                     conditionalPanel("input.deployments_rows_selected != 0",
                                                                      h6("You Must Pick a QA/QC & Flag Status for the Deployment to be Able to Edit!")),
                                                     actionButton("update_button", "Update", icon("paper-plane"), 
@@ -111,7 +111,14 @@ ui <- tagList(useShinyjs(), navbarPage("QA/QC Tracking App", id = "TabPanelID", 
                                                 )
                                        )
                                        )
-)
+),
+tags$style(HTML("
+  #qaqc_comments {
+    color: black !important;  /* Ensures text color is black */
+    font-weight: bold !important;  /* Makes the text bold */
+  }
+"))
+
 )
                                   
 # Server logic
