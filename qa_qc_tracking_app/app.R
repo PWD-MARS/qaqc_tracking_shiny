@@ -32,6 +32,8 @@ library(RPostgres)
 library(shinipsum)
 #package versioning
 library(renv)
+#css
+library(shinycssloaders)
 #Not in logical
 `%!in%` <- Negate(`%in%`)
 
@@ -104,7 +106,7 @@ ui <- tagList(useShinyjs(), navbarPage("QA/QC Tracking App", id = "TabPanelID", 
                                                 mainPanel(
                                                   #DTOutput("deployments"),
                                                   strong(span(textOutput("table_name"), style = "font-size:22px")),
-                                                  reactableOutput("deployments"),
+                                                  reactableOutput("deployments") %>% withSpinner(color="#0dc5c1"),
                                                   #verbatimTextOutput("table_state"),
                                                   width = 9
                                                   
