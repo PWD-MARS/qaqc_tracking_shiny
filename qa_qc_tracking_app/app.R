@@ -115,10 +115,8 @@ ui <- tagList(
           width = 3
         ),
         mainPanel(
-          # DTOutput("deployments"),
           strong(span(textOutput("table_name"), style = "font-size:22px")),
           reactableOutput("deployments") %>% withSpinner(color = "#0dc5c1"),
-          # verbatimTextOutput("table_state"),
           width = 9
         )
       )
@@ -162,7 +160,8 @@ server <- function(input, output, session) {
 
   output$table_name <- renderText(ifelse(input$f_q == "All", "Full List of Short/Long-Term Deployments of Water level Sensors Across Every Fiscal Quarter:", paste("Short/Long-Term Deployments of Water level Sensors Collected or Expected to be Collected in ", input$f_q, " (", rv$start_date(), " to ", rv$end_date(), ")", ": ", sep = "")))
 
-
+  # get row number
+  selected_row <- reactive(getReactableState("deployments", "selected"))
 
   # process text field to prevent sql injection
   rv$reason_step <- reactive(gsub("'", "''", input$qaqc_comments))
@@ -170,34 +169,19 @@ server <- function(input, output, session) {
 
   # toggle state for the update button
   observe(toggleState(id = "update_button", condition = !is.null(input$deployments_rows_selected) & input$status != "" & input$flagged != ""))
-  selected_row <- reactiveVal()
-
-
-  # get the reactable state of the deployment table in the mainPanel
-  # output$table_state <- renderPrint({
-  #   state <- req(getReactableState("deployments"))
-  #   print(state)
-  # })
-  #
-
 
   # Update the values in the drop-down menus when a row is selected
   observeEvent(input$deployments_rows_selected, {
-    # Get the selected row
-    # row <- input$deployments_rows_selected
-    row <- getReactableState("deployments", "selected")
-
     # Update the reactive value
-    if (!is.null(row)) {
-      selected_row(row)
+    if (!is.null(selected_row())) {
 
-      rv$textbox_notes <- reactive(rv$status_notes()[rv$status_notes()$deployment_uid == rv$collect_table_filter()$deployment_uid[row], ] %>%
+      rv$textbox_notes <- reactive(rv$status_notes()[rv$status_notes()$deployment_uid == rv$collect_table_filter()$deployment_uid[selected_row()], ] %>%
         select(qaqc_notes) %>%
         pull())
 
       updateTextAreaInput(session, "qaqc_comments", value = rv$textbox_notes())
-      updateSelectInput(session, "status", selected = rv$collect_table_filter()$status[row])
-      updateSelectInput(session, "flagged", selected = rv$collect_table_filter()$flagged[row])
+      updateSelectInput(session, "status", selected = rv$collect_table_filter()$status[selected_row()])
+      updateSelectInput(session, "flagged", selected = rv$collect_table_filter()$flagged[selected_row()])
     }
   })
 
@@ -221,8 +205,6 @@ server <- function(input, output, session) {
   # Data day for gw
   gw_data_day <- odbc::dbGetQuery(poolConn, "SELECT * FROM data.mat_gw_data_day") %>%
     mutate(gw_data_exist = "Yes")
-
-
 
 
   # data gaps
@@ -303,42 +285,39 @@ server <- function(input, output, session) {
     distinct())
 
   observeEvent(input$update_button, {
-    row <- getReactableState("deployments", "selected")
 
-    # if(is.na(rv$collect_table_filter()$qaqc_notes[row]) & is.na(rv$collect_table_filter()$status[row])) {
-
-    if ((input$status != "" | rv$input_note() != "") & rv$collect_table_filter()$deployment_uid[row] %!in% rv$status_notes()$deployment_uid) {
+    if ((input$status != "" | rv$input_note() != "") & rv$collect_table_filter()$deployment_uid[selected_row()] %!in% rv$status_notes()$deployment_uid) {
       new_note_status <- data.frame(
-        deployment_uid = rv$collect_table_filter()$deployment_uid[row],
+        deployment_uid = rv$collect_table_filter()$deployment_uid[selected_row()],
         status = input$status,
         qaqc_notes = rv$input_note()
       )
 
       odbc::dbWriteTable(poolConn, Id(schema = "fieldwork", table = "tbl_qaqc_status"), new_note_status, append = TRUE, row.names = FALSE)
-    } else if ((input$status != "" | rv$input_note() != "") & rv$collect_table_filter()$deployment_uid[row] %in% rv$status_notes()$deployment_uid) {
+    } else if ((input$status != "" | rv$input_note() != "") & rv$collect_table_filter()$deployment_uid[selected_row()] %in% rv$status_notes()$deployment_uid) {
       edit_query <- paste0(
-        "Update fieldwork.tbl_qaqc_status SET status ='", input$status, "', qaqc_notes = '", rv$input_note(), "' where deployment_uid = ", rv$collect_table_filter()$deployment_uid[row]
+        "Update fieldwork.tbl_qaqc_status SET status ='", input$status, "', qaqc_notes = '", rv$input_note(), "' where deployment_uid = ", rv$collect_table_filter()$deployment_uid[selected_row()]
       )
       odbc::dbGetQuery(poolConn, edit_query)
     } else {
       delete_query <- paste0(
-        "delete from fieldwork.tbl_qaqc_status where deployment_uid = ", rv$collect_table_filter()$deployment_uid[row]
+        "delete from fieldwork.tbl_qaqc_status where deployment_uid = ", rv$collect_table_filter()$deployment_uid[selected_row()]
       )
       odbc::dbGetQuery(poolConn, delete_query)
     }
 
     # update flagged status based on rv$flagged_system()
 
-    if (rv$collect_table_filter()$system_id[row] %!in% rv$flagged_system()$system_id) {
+    if (rv$collect_table_filter()$system_id[selected_row()] %!in% rv$flagged_system()$system_id) {
       new_flag <- data.frame(
-        system_id = rv$collect_table_filter()$system_id[row],
+        system_id = rv$collect_table_filter()$system_id[selected_row()],
         flagged = ifelse(input$flagged == "Yes", TRUE, FALSE)
       )
 
       odbc::dbWriteTable(poolConn, Id(schema = "fieldwork", table = "tbl_flagged_systems"), new_flag, append = TRUE, row.names = FALSE)
     } else {
       edit_flag <- paste0(
-        "Update fieldwork.tbl_flagged_systems SET flagged = ", ifelse(input$flagged == "Yes", TRUE, FALSE), " where system_id = '", rv$collect_table_filter()$system_id[row], "'"
+        "Update fieldwork.tbl_flagged_systems SET flagged = ", ifelse(input$flagged == "Yes", TRUE, FALSE), " where system_id = '", rv$collect_table_filter()$system_id[selected_row()], "'"
       )
       odbc::dbGetQuery(poolConn, edit_flag)
     }
@@ -357,8 +336,7 @@ server <- function(input, output, session) {
   output$deployments <- renderReactable(
     reactable(
       rv$collect_table_filter() %>%
-        select(`SMP ID` = smp_id, `OW Suffix` = ow_suffix, `Project Name` = project_name, Term = term, `Collection Date` = collection_status, `Data in DB?` = qa_qc, `QA/QC Status` = status, `Post-Con Status?` = postcon_exist, `Flagged?` = flagged, `Gap Days` = datagap_days, deployment_uid, -deployment_uid) %>%
-        distinct(),
+        select(`SMP ID` = smp_id, `OW Suffix` = ow_suffix, `Project Name` = project_name, Term = term, `Collection Date` = collection_status, `Data in DB?` = qa_qc, `QA/QC Status` = status, `Post-Con Status?` = postcon_exist, `Flagged?` = flagged, `Gap Days` = datagap_days),
       theme = darkly(),
       fullWidth = TRUE,
       selection = "single",
