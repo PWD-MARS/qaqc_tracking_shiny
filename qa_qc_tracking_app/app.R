@@ -3,7 +3,7 @@
 # Last changed: 04/04/2024
 
 # SET UP
-# 0.0: load libraries --------------
+# 0.0: load libraries -------------
 library(shiny)
 # pool for database connections
 library(pool)
