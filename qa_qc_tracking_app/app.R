@@ -47,7 +47,7 @@ options(DT.options = list(pageLength = 25))
 # gets environmental variables saved in local or pwdrstudio environment
 # poolConn <- dbPool(odbc(), dsn = "mars14_datav2", uid = Sys.getenv("shiny_uid"), pwd = Sys.getenv("shiny_pwd"))
 poolConn <- dbPool(RPostgres::Postgres(),
-  dbname = "sandbox_dtime",
+  dbname = "mars_prod",
   host = "PWDMARSDBS1",
   port = 5434,
   user = Sys.getenv("shiny_uid"),
