@@ -3,7 +3,7 @@
 # Last changed: 04/04/2024
 
 # SET UP
-# 0.0: load libraries --------------
+# 0.0: load libraries -------------
 library(shiny)
 # pool for database connections
 library(pool)
@@ -47,7 +47,7 @@ options(DT.options = list(pageLength = 25))
 # gets environmental variables saved in local or pwdrstudio environment
 # poolConn <- dbPool(odbc(), dsn = "mars14_datav2", uid = Sys.getenv("shiny_uid"), pwd = Sys.getenv("shiny_pwd"))
 poolConn <- dbPool(RPostgres::Postgres(),
-  dbname = "mars_data",
+  dbname = "mars_prod",
   host = "PWDMARSDBS1",
   port = 5434,
   user = Sys.getenv("shiny_uid"),
@@ -191,7 +191,7 @@ server <- function(input, output, session) {
     mutate(postcon_exist = "Yes")
 
   # query the collection calendar and arrange by deployment_uid
-  collect_query <- "select *, admin.fun_smp_to_system(smp_id) as system_id ,data.fun_date_to_fiscal_quarter(cast(date_100percent AS DATE)) as expected_fiscal_quarter, data.fun_date_to_fiscal_quarter(cast(collection_dtime_est AS DATE)) as collected_fiscal_quarter from fieldwork.viw_qaqc_deployments"
+  collect_query <- "select *, admin.fun_smp_to_system(smp_id) as system_id ,data.fun_date_to_fiscal_quarter(cast(date_100percent AS DATE)) as expected_fiscal_quarter, data.fun_date_to_fiscal_quarter(cast(collection_dtime AS DATE)) as collected_fiscal_quarter from fieldwork.viw_qaqc_deployments"
 
   # pull notes and status
   rv$status_notes <- reactive(odbc::dbGetQuery(poolConn, "SELECT * FROM fieldwork.tbl_qaqc_status"))
@@ -214,23 +214,23 @@ server <- function(input, output, session) {
   rv$collect_table_db <- reactive(odbc::dbGetQuery(poolConn, collect_query) %>%
     mutate(fiscal_quarter = ifelse(collected_fiscal_quarter == "", expected_fiscal_quarter, collected_fiscal_quarter)) %>%
     inner_join(fq, by = "fiscal_quarter") %>%
-    mutate(after_deployment_day = deployment_dtime_est + days(1)) %>%
+    mutate(after_deployment_day = deployment_dtime + days(1)) %>%
     mutate(gw = ifelse(ow_suffix == "GW1" | ow_suffix == "GW2" | ow_suffix == "GW3" | ow_suffix == "GW4" | ow_suffix == "GW5" | ow_suffix == "CW1", "Yes", "No")) %>%
     left_join(level_data_day, by = c("ow_uid" = "ow_uid", "after_deployment_day" = "level_data_day")) %>%
     left_join(gw_data_day, by = c("ow_uid" = "ow_uid", "after_deployment_day" = "gw_data_day")) %>%
     mutate(qa_qc = case_when(
-      is.na(collection_dtime_est) ~ "No",
+      is.na(collection_dtime) ~ "No",
       gw == "Yes" ~ ifelse(is.na(gw_data_exist), "No", "Yes"),
       gw == "No" ~ ifelse(is.na(level_data_exist), "No", "Yes")
     )) %>%
-    mutate(collection_status = ifelse(is.na(collection_dtime_est), "Not Collected", as.character(collection_dtime_est))) %>%
+    mutate(collection_status = ifelse(is.na(collection_dtime), "Not Collected", as.character(collection_dtime))) %>%
     left_join(rv$status_notes(), by = "deployment_uid") %>%
     left_join(rv$flagged_system(), by = "system_id") %>%
     mutate(flagged = ifelse(flagged == 1, "Yes", "No")) %>%
     filter(sensor_purpose == 2 & long_term_lookup_uid %in% c(1, 2)) %>%
     arrange(ow_suffix) %>%
     arrange(desc(fiscal_quarter_lookup_uid)) %>%
-    arrange(desc(collection_dtime_est)) %>%
+    arrange(desc(collection_dtime)) %>%
     arrange(qa_qc))
 
   rv$term_filter <- reactive(
@@ -260,7 +260,7 @@ server <- function(input, output, session) {
   rv$collect_table_filter <- reactive(rv$collect_table_db() %>%
     left_join(datagaps, by = "deployment_uid") %>%
     left_join(postcon_table, by = "system_id") %>%
-    mutate(collection_dtime_est = collection_dtime_est %>% lubridate::ymd()) %>%
+    mutate(collection_dtime = collection_dtime %>% lubridate::ymd()) %>%
     # use 1 or 0 for public or private, respectively, and 0.5 for both, with a tolerance of .51
     # so if .5 is selected, 0 and 1 are picked up
     dplyr::filter(near(as.numeric(public), as.numeric(input$property_type), tol = 0.51) &

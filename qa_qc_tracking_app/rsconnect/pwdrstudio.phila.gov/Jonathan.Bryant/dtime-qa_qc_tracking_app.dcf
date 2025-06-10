@@ -1,0 +1,12 @@
+name: dtime-qa_qc_tracking_app
+title: dtime-qa_qc_tracking_app
+username: Jonathan.Bryant
+account: Jonathan.Bryant
+server: pwdrstudio.phila.gov
+hostUrl: https://pwdrstudio.phila.gov/__api__
+appId: 510
+bundleId: 3279
+url: https://pwdrstudio.phila.gov/content/6ec3bc75-40ac-4ce6-8f10-59e724fe4442/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE
